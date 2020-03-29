@@ -11,7 +11,8 @@
 </template>
 
 <script>
-import { setPx } from "../../Form/utils/util";
+
+import { setPx } from "../../utils/util";
 
 export default {
   name: "zCode",
