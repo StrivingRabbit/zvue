@@ -139,7 +139,7 @@ export default function (type) {
                     default: false
                 },
                 rules: {
-                    type: Array
+                    type: [Array, Object]
                 },
                 row: {
                     type: Boolean,

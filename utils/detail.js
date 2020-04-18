@@ -14,7 +14,7 @@ export const detail = (row = {}, column = {}, option = {}, dic = []) => {
   };
   // 自定义格式化
   if (column.formatter && typeof column.formatter === 'function') {
-    result = column.formatter(row, row[column.prop], result, column);
+    result = column.formatter(row, row[column.prop], column.label, column);
     return result;
   }
 
@@ -60,4 +60,6 @@ export const detail = (row = {}, column = {}, option = {}, dic = []) => {
     );
     return result;
   }
+
+  return result;
 };

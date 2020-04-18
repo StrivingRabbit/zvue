@@ -42,7 +42,7 @@
               :check-strictly="checkStrictly"
               :current-node-key="multiple?'':text"
               :filter-node-method="filterNode"
-              :default-expanded-keys="defaultExpandedKeys?defaultExpandedKeys:(defaultExpandAll?keysList:[])"
+              :default-expanded-keys="defaultExpandedKeys?defaultExpandedKeys:(defaultExpandAll?[]:keysList)"
               :default-checked-keys="defaultCheckedKeys?defaultCheckedKeys:keysList"
               :default-expand-all="defaultExpandAll"
               @check="checkChange"
@@ -106,7 +106,6 @@
   </div>
 </template>
 <script>
-
 import props from "../../../common/props";
 import events from "../../../common/events";
 import { validatenull } from "../../../utils/validate";
@@ -195,7 +194,7 @@ export default {
     },
     defaultExpandAll: {
       type: Boolean,
-      default: true
+      default: false
     },
     parent: {
       type: Boolean,
@@ -388,7 +387,7 @@ export default {
       return list;
     },
     keysList() {
-      return this.multiple ? this.text : [];
+      return this.multiple ? this.text : [this.text];
     },
     isTree() {
       return this.type === "tree";

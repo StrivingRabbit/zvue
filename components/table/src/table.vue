@@ -1,7 +1,7 @@
 <template>
   <div class="zvue-table-wrapper" :style="{height:wrapperHeight}">
     <div
-      v-if="options.customTop"
+      v-if="options.customTop || $scopedSlots['custom-top']"
       ref="customTop"
       :style="{textAlign:options.customTopPosition || config.customTopPosition,height:'auto',padding:'0 20px 20px'}"
     >
@@ -57,81 +57,21 @@
         >
           <template slot="header">{{uiConfig.showIndex.label || config.indexLabel}}</template>
         </el-table-column>
+        <!-- 解决使用column组件多选索引顺序错位 -->
         <el-table-column width="1px"></el-table-column>
 
-        <!-- 使用column组件会导致多选索引顺序错位 -->
-        <!-- <column :columnConfig="columnConfig">
-        <template v-for="col in columnConfig">
-          <template slot-scope="{column}" :slot="`${col.prop}Header`">
+        <column :columnConfig="columnConfig">
+          <template v-for="col in columnConfig" slot-scope="{column}" :slot="`${col.prop}Header`">
             <slot :name="`${col.prop}Header`" :column="column"></slot>
           </template>
-          <template :slot="col.prop" slot-scope="{scopeRow}">
-            <slot :name="col.prop" :scopeRow="scopeRow"></slot>
-          </template>
-        </template>
-        </column>-->
-
-        <!-- 正常列 -->
-        <template v-for="col in columnConfig">
-          <el-table-column
-            v-if="!col.hide"
-            show-overflow-tooltip
-            :key="col.label"
-            :prop="col.prop"
-            :label="col.label"
-            :width="col.width"
-            :fixed="col.fixed"
-            :sortable="col.sortable || false"
-            :align="col.align || options.align || config.align"
-            :header-align="col.headerAlign || options.headerAlign || config.headerAlign"
-            :render-header="col.renderHeader"
+          <template
+            v-for="col in columnConfig"
+            :slot="col.prop"
+            slot-scope="{scopeRow,label,row,size,column,disabled,isEdit,dic}"
           >
-            <template v-if="col.headerSlot" slot="header">
-              <slot :name="`${col.prop}Header`" :column="col"></slot>
-            </template>
-            <template slot-scope="scopeRow">
-              <slot
-                v-if="col.slot"
-                :name="col.prop"
-                :label="handleDetail(scopeRow.row,col,DIC[col.prop])"
-                :scopeRow="scopeRow"
-                :row="scopeRow.row"
-                :size="controlSize"
-                :column="col"
-                :disabled="col.disabled"
-                :isEdit="cellEditFlag(scopeRow.row,col)"
-                :dic="DIC[col.prop]"
-              ></slot>
-              <form-temp
-                v-else-if="cellEditFlag(scopeRow.row,col)"
-                v-model="scopeRow.row[col.prop]"
-                :isCrud="true"
-                :column="col"
-                :size="controlSize"
-                :dic="DIC[col.prop]"
-                :upload-before="col.uploadBefore"
-                :upload-after="col.uploadAfter"
-                :disabled="col.disabled"
-                @click.native.stop
-              ></form-temp>
-              <template v-else>
-                <span
-                  v-if="['array'].includes(col.type)"
-                >{{_detailData(scopeRow.row[col.prop],col.dataType).join(' | ')}}</span>
-                <span v-else-if="col.displayAs=='switch' && ['switch'].includes(col.type)">
-                  <z-switch
-                    :size="controlSize"
-                    v-model="scopeRow.row[col.prop]"
-                    :activeColor="col.activeColor"
-                    :inactiveColor="col.inactiveColor"
-                    disabled
-                  />
-                </span>
-                <span v-else v-html="_columnFormatter(scopeRow,col)"></span>
-              </template>
-            </template>
-          </el-table-column>
-        </template>
+            <slot :name="col.prop" v-bind="{scopeRow,label,row,size,column,disabled,isEdit,dic}"></slot>
+          </template>
+        </column>
 
         <!-- 列操作 -->
         <el-table-column
@@ -165,7 +105,7 @@
             >取 消</el-button>
             <!-- 操作列的slot -->
             <slot
-              v-if="options.operation"
+              v-if="options.operation || $scopedSlots.operation"
               :name="config.operationSlotName"
               :scopeRow="scopeRow"
               :row="scopeRow.row"
@@ -221,8 +161,7 @@
   </div>
 </template>
 <script>
-
-// import column from "./components/column";
+import column from "../column";
 import config from "../../../global/config";
 import props from "../../../common/props";
 import init from "../../../common/init";
@@ -248,7 +187,7 @@ let preventClick = ["selection", "operation"];
 export default {
   name: "zTable",
   mixins: [props("crud"), init("crud")],
-  components: { formTemp },
+  components: { formTemp, column },
   props: {
     propsHttp: {
       type: Object,
@@ -366,8 +305,8 @@ export default {
               typeof row[currentProp] === "number"
                 ? row[currentProp] == this.searchVal.toLowerCase()
                 : row[currentProp]
-                    .toLowerCase()
-                    .includes(this.searchVal.toLowerCase());
+                  .toLowerCase()
+                  .includes(this.searchVal.toLowerCase());
 
             return !this.searchVal || isMatch;
           });
@@ -427,11 +366,6 @@ export default {
         .then(res => {
           this._setTableData(res[this.listKey]);
           this.setPaginationTotal(res[this.totalKey]);
-        })
-        .catch(err => {
-          //加载中结束
-          this.loading = false;
-          throw err;
         })
         .finally(() => {
           //加载中结束
@@ -644,77 +578,10 @@ export default {
           this.$message.warning(errors[0]);
         });
     },
-    _detailData(list, dataType) {
-      if (!Array.isArray(list) && ["string", "number"].includes(dataType)) {
-        return list.split(",");
-      }
-      return list;
-    },
-    // 由于slot-scope和formatter不能共存只能如此
-    _columnFormatter(scopeRow, currentColumn) {
-      let row = scopeRow.row;
-      let column = scopeRow.column;
-
-      if (typeof currentColumn.formatter === "function") {
-        return currentColumn.formatter(row, column);
-      } else {
-        return this._globalColumnFormatter(row, column, currentColumn);
-      }
-    },
-    // 全局初始化
-    _globalColumnFormatter(row, column, currentColumn) {
-      let value = row[column.property];
-      if (this.validatenull(value)) {
-        return "--";
-      }
-      return this.handleDetail(
-        row,
-        currentColumn,
-        this.DIC[currentColumn.prop]
-      );
-    },
-    handleDetail(row, column, DIC) {
-      let result = row[column.prop];
-
-      if (typeof column.type === "undefined") return result || "-";
-
-      // 如果是级联，切值为字符串，则需要对值进行处理
-      if (column.type === "cascader" && typeof result === "string") {
-        let list = result.split(",");
-        if (list.length > 1) {
-          row = _.cloneDeep(row);
-          row[column.prop] = list;
-        }
-      }
-      // 进行取值处理，取出对应的label值
-      result = detail(row, column, this.tableOption, DIC);
-      if (!this.validatenull(DIC)) {
-        row["$" + column.prop] = result;
-      }
-      // 如果是级联，则对结果进行处理
-      if (column.type === "cascader") {
-        let { prop, props, presentText, showAllLevels } = column;
-        // 如果开启了elementUI级联的lazy模式，则从column.presentText中读值，此值在cascader的mounted中赋值
-        if (props && props.lazy) {
-          result = presentText;
-          row["$" + prop] = presentText;
-        }
-        if (showAllLevels === false && typeof result === "string") {
-          let list = result.split(DIC_SPLIT);
-          result = list[list.length - 1];
-        }
-      }
-      return result;
-    },
 
     /**
      * table触发方法
      */
-    cellEditFlag(row, column) {
-      // && column.slot !== true
-      // console.log("isEdit", row, column, row.$cellEdit && column.cell);
-      return !!(row.$cellEdit && column.cell);
-    },
     //行单击事件
     rowClick(row, column, e) {
       //如果是操作列则不执行
@@ -864,7 +731,7 @@ export default {
       this.$refs.dataBaseTable.clearFilter(columnKey);
     },
     //以下方法未添加
-    toggleRowExpansion() {},
+    toggleRowExpansion() { },
 
     /**
      * 外部调用方法
@@ -1068,7 +935,7 @@ export default {
     //如果开启分页，则根据设置的分页规则进行分页，后期还需要添加ajax服务器分页
     paginationObj: {
       deep: true,
-      handler: function(newVal, oldVal) {
+      handler: function (newVal, oldVal) {
         // 如果有handler，则拦截分页方法。为了兼容服务端自己写请求数据方法
         if (this.uiConfig.pagination.handler) {
           return;
@@ -1108,27 +975,17 @@ export default {
 @headerTextColor: #666;
 @TableFontFamily: "Microsoft YaHei";
 @TableFontSize: 14px;
+@borderColor: #e5eaf2;
 
 .zvue-table-wrapper {
   font-family: @TableFontFamily;
   font-size: @TableFontSize;
   width: 100%;
   .el-table {
+    border: 1px solid @borderColor;
+    border-bottom: 0px;
     .el-table__fixed-right-patch {
       background-color: @headerBgc;
-      border: 1px solid #e5eaf2;
-      border-left: 0px;
-    }
-    .el-table__header,
-    .el-table__body {
-      border: 1px solid #e5eaf2;
-      border-bottom: 0px;
-    }
-    .el-table__header {
-      border-right: 0px;
-    }
-    .el-table__body {
-      border-top: 0px;
     }
     // 去除多选宽度不够会显示省略号
     .el-table-column--selection {
@@ -1158,18 +1015,6 @@ export default {
         width: auto !important;
       }
     }
-    // 当前行
-    .current-row {
-      td {
-        background-color: #f5fafb !important;
-      }
-      .edit-row-input {
-        display: block;
-      }
-      .edit-row-input + span {
-        display: none;
-      }
-    }
     // 下拉
     .el-dropdown {
       margin-left: 10px;
@@ -1181,9 +1026,6 @@ export default {
       .el-icon--right {
         margin-left: 0;
       }
-    }
-    .edit-row-input {
-      display: none;
     }
   }
   // 分页

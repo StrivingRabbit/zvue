@@ -2,7 +2,7 @@
   <div class="zvue-form-wrapper" :style="{width:setPx(parentOption.width,'100%')}">
     <el-form
       :ref="formRef"
-      status-icon
+      :status-icon="vaildData(parentOption.statusIcon,false)"
       :label-suffix="parentOption.labelSuffix || '：'"
       :rules="formRules"
       :model="model"
@@ -615,7 +615,7 @@ export default {
     border: none !important;
     background: none;
   }
-  .z-form_upload {
+  .zvue-form-upload {
     // 头像上传
     .picture-list .el-upload {
       border: 1px dashed #d9d9d9;
@@ -650,9 +650,12 @@ export default {
     }
   }
   // 下拉树的样式调整
-  .el-input_tree {
+  .zvue-input-tree {
     .el-scrollbar__wrap {
       overflow-x: hidden;
+    }
+    .el-tree-node__content {
+      padding: 0;
     }
   }
   // 分组

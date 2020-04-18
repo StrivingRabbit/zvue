@@ -82,6 +82,7 @@ export const initVal = ({ listType, type, multiple, dataType, value, curentForm 
         (['select', 'tree'].includes(type) && multiple) ||
         ['cascader', 'checkbox', 'dynamic', 'upload'].includes(type)
     ) {
+        let isCascader = type === 'cascader';
         // 头像框特殊处理
         if (listType === 'picture-img' && type === 'upload') {
             if (typeof value === 'string' && value.trim().length > 0) {
@@ -95,7 +96,7 @@ export const initVal = ({ listType, type, multiple, dataType, value, curentForm 
         } else if (!validatenull(value) && typeof value === 'string') {
             const list = (value || '').split(',') || [];
             // 如果只有一项，则重新转换为字符串，对应一个id反显级联
-            if (list.length <= 1) {
+            if (list.length <= 1 && isCascader) {
                 value = list.join(',')
             } else {
                 value = list;

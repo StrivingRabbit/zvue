@@ -4,39 +4,16 @@
     width="100%"
     height="100%"
     :is="componentId"
-    :data="options.data"
-    :grid="options.grid"
-    :colors="options.colors"
-    :visualMap="options.visualMap"
-    :dataZoom="options.dataZoom"
-    :toolbox="options.toolbox"
-    :title="options.title"
-    :legend="options.legend"
-    :yAxis="options.yAxis"
-    :xAxis="options.xAxis"
-    :radar="options.radar"
-    :tooltip="options.tooltip"
-    :axisPointer="options.axisPointer"
-    :brush="options.brush"
-    :geo="options.geo"
-    :timeline="options.timeline"
-    :graphic="options.graphic"
-    :series="options.series"
-    :backgroundColor="options.backgroundColor"
-    :textStyle="options.textStyle"
-    :animation="options.animation"
-    :settings="options.settings"
-    :extend="options.extend"
-    :events="options.events"
-    :legend-visible="options.legendVisible"
-    :tooltip-visible="options.tooltipVisible"
-    :init-options="options.initOptions"
-    :theme-name="options.themeName"
-    :theme="options.theme"
-    :set-option-opts="options.setOptionOpts"
-    :log="options.log"
     :loading="loading"
     :data-empty="dataEmpty"
+    v-bind="options"
+    :legend-visible="legendVisible"
+    :tooltip-visible="tooltipVisible"
+    :mark-line="markLine"
+    :mark-area="markArea"
+    :mark-point="markPoint"
+    @ready="_ready"
+    @ready-once="_readyOnce"
   ></component>
 </template>
 <script>
@@ -51,9 +28,29 @@ const EMPTY_DATA = {
 export default {
   name: "zCharts",
   props: {
+    load: {
+      type: Boolean
+    },
     options: {
       type: Object,
       required: true
+    },
+    "mark-line": {
+      type: Object
+    },
+    "mark-area": {
+      type: Object
+    },
+    "mark-point": {
+      type: Object
+    },
+    "legend-visible": {
+      type: Boolean,
+      default: true
+    },
+    "tooltip-visible": {
+      type: Boolean,
+      default: true
     }
   },
   data() {
@@ -69,6 +66,12 @@ export default {
     this.charts = this.$refs["myCharts"];
   },
   methods: {
+    _ready(...args) {
+      this.$emit("ready", ...args);
+    },
+    _readyOnce(...args) {
+      this.$emit("ready-once", ...args);
+    },
     _chartInit() {
       // 服务器模式
       if (this._isServerMode) {
@@ -83,7 +86,7 @@ export default {
       let serverMode = this.data.serverMode;
       let url = serverMode.url;
       let dataSrc = serverMode.dataSrc;
-      
+
       this._axios({
         mehtod: serverMode.type,
         url: url,
@@ -146,6 +149,9 @@ export default {
     }
   },
   watch: {
+    load(newVal) {
+      this.loading = newVal;
+    },
     "options.data"(newvalue, oldvalue) {
       if (!(newvalue.rows instanceof Array) || newvalue.rows.length === 0) {
         this.dataEmpty = true;
@@ -155,4 +161,52 @@ export default {
     }
   }
 };
+
+/**
+ * :data="options.data"
+    :grid="options.grid"
+    :colors="options.colors"
+    :visualMap="options.visualMap"
+    :dataZoom="options.dataZoom"
+    :toolbox="options.toolbox"
+    :title="options.title"
+    :legend="options.legend"
+    :yAxis="options.yAxis"
+    :xAxis="options.xAxis"
+    :radar="options.radar"
+    :tooltip="options.tooltip"
+    :axisPointer="options.axisPointer"
+    :brush="options.brush"
+    :geo="options.geo"
+    :timeline="options.timeline"
+    :graphic="options.graphic"
+    :series="options.series"
+    :backgroundColor="options.backgroundColor"
+    :textStyle="options.textStyle"
+    :animation="options.animation"
+    :settings="options.settings"
+    :extend="options.extend"
+    :events="options.events"
+    :legend-visible="options.legendVisible"
+    :tooltip-visible="options.tooltipVisible"
+    :init-options="options.initOptions"
+    :theme-name="options.themeName"
+    :theme="options.theme"
+    :set-option-opts="options.setOptionOpts"
+    :log="options.log"
+    background-color
+    // hooks
+    :before-config="beforeConfig"
+    :after-config="afterConfig"
+    :after-set-option="afterSetOption"
+    :after-set-option-once="afterSetOptionOnce"
+
+    @ready="ready"
+    @ready-once="readyOnce"
+
+    resizeable
+    resize-delay
+
+    load
+ */
 </script>

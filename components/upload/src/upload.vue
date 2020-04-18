@@ -1,5 +1,5 @@
 <template>
-  <div class="z-form_upload" v-loading.lock="loading">
+  <div class="zvue-form-upload" v-loading.lock="loading" :style="[uploadStyle]">
     <el-upload
       :class="{'picture-list':listType=='picture-img','el-upload_disabled':disabled}"
       :action="action"
@@ -32,13 +32,13 @@
         <i class="el-icon-upload"></i>
         <div class="el-upload__text">
           将文件拖到此处，或
-          <em>点击上传</em>
+          <em>{{buttonText}}</em>
         </div>
       </template>
       <template v-else>
-        <el-button size="small" type="primary">点击上传</el-button>
+        <el-button size="small" type="primary">{{buttonText}}</el-button>
       </template>
-      <div slot="tip" class="el-upload__tip">{{tip}}</div>
+      <div v-if="!onlyButton" slot="tip" class="el-upload__tip">{{tip}}</div>
     </el-upload>
     <el-dialog append-to-body :modal-append-to-body="false" :visible.sync="dialogVisible">
       <div class="avue-dialog">
@@ -49,7 +49,6 @@
 </template>
 
 <script>
-
 import props from "../../../common/props";
 import events from "../../../common/events";
 import { validatenull } from "../../../utils/validate";
@@ -102,7 +101,7 @@ export default {
       default: () => ({})
     },
     filesize: {
-      type: String
+      type: [String, Number]
     },
     drag: {
       type: Boolean,
@@ -119,6 +118,14 @@ export default {
     autoUpload: {
       type: Boolean,
       default: true
+    },
+    onlyButton: {
+      type: Boolean,
+      default: false
+    },
+    buttonText: {
+      type: String,
+      default: "点击上传"
     },
     uploadBefore: Function,
     uploadAfter: Function
@@ -166,6 +173,14 @@ export default {
         return accept.substring(0, accept.length);
       }
       return "*";
+    },
+    uploadStyle() {
+      if (this.onlyButton) {
+        return {
+          display: "inline-block"
+        };
+      }
+      return {};
     }
   },
   created() {},
@@ -208,7 +223,7 @@ export default {
     },
     handleError(msg) {
       console.error(new Error(msg));
-      this.$message.error(msg || "上传失败");
+      this.$message.error(typeof msg === "string" ? msg : "上传失败");
     },
     delete(file) {
       if (this.isArray || this.isString) {
@@ -223,7 +238,11 @@ export default {
     },
     show(data) {
       this.loading = false;
-      this.handleSuccess(data);
+      if (typeof data === "object" && data != null) {
+        this.handleSuccess(data);
+      } else {
+        this.$message.success("上传成功");
+      }
     },
     hide(msg) {
       this.loading = false;
@@ -328,8 +347,12 @@ export default {
       if (!this.filesize) {
         return false;
       }
-      let unit = this.filesize.toUpperCase();
-      let fileSizeLimit = parseFloat(this.filesize);
+      let vmFileSize = this.filesize;
+      if (typeof vmFileSize === "number") {
+        vmFileSize = vmFileSize.toString() + "kb";
+      }
+      let unit = vmFileSize.toUpperCase();
+      let fileSizeLimit = parseFloat(vmFileSize);
 
       if (unit.indexOf("KB") != -1) {
         return filesize / Math.pow(1024, 1) > fileSizeLimit;

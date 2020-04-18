@@ -88,7 +88,7 @@ export default {
             options.uiConfig.height = "auto";
           } else {
             options.uiConfig = {
-              size: this.children.size,
+              size: this.children.size || 'small',
               pagination: false,
               height: "auto"
             };
