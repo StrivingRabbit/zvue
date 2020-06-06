@@ -1,7 +1,7 @@
 <template>
   <div class="zvue-form-upload" v-loading.lock="loading" :style="[uploadStyle]">
     <el-upload
-      :class="{'picture-list':listType=='picture-img','el-upload_disabled':disabled}"
+      :class="{'picture-list':listType=='picture-img','el-upload_disabled':allDisabled}"
       :action="action"
       :accept="elAccept"
       :auto-upload="autoUpload"
@@ -12,7 +12,7 @@
       :multiple="multiple"
       :limit="limit"
       :http-request="autoUpload ? httpRequest : undefined"
-      :disabled="disabled"
+      :disabled="allDisabled"
       :file-list="fileList"
       :drag="drag"
       :readonly="readonly"
@@ -41,9 +41,19 @@
       <div v-if="!onlyButton" slot="tip" class="el-upload__tip">{{tip}}</div>
     </el-upload>
     <el-dialog append-to-body :modal-append-to-body="false" :visible.sync="dialogVisible">
-      <div class="avue-dialog">
+      <!-- <div class="avue-dialog">
         <img v-if="dialogImgType" width="100%" :src="dialogImageUrl" alt />
-      </div>
+      </div>-->
+      <el-carousel
+        :autoplay="false"
+        trigger="click"
+        indicator-position="outside"
+        :initial-index="initialIndex"
+      >
+        <el-carousel-item v-for="item in fileList" :key="item.url">
+          <img v-if="dialogImgType" width="100%" :src="item.url" alt="item.url" />
+        </el-carousel-item>
+      </el-carousel>
     </el-dialog>
   </div>
 </template>
@@ -63,7 +73,9 @@ export default {
       dialogImgType: true,
       dialogVisible: false,
       text: [],
-      file: {}
+      file: {},
+      initialIndex: 0,
+      insideFileList: [] // 当不自动上传时，file保存进这个对象
     };
   },
   props: {
@@ -128,7 +140,9 @@ export default {
       default: "点击上传"
     },
     uploadBefore: Function,
-    uploadAfter: Function
+    uploadAfter: Function,
+    uploadSuccess: Function,
+    uploadError: Function
   },
   computed: {
     fileName() {
@@ -181,16 +195,22 @@ export default {
         };
       }
       return {};
+    },
+    allDisabled() {
+      return this.textMode ? true : this.disabled
+    },
+    resultList() {
+      return this.autoUpload ? this.text : this.insideFileList
     }
   },
-  created() {},
+  created() { },
   watch: {},
-  mounted() {},
+  mounted() { },
   methods: {
     validatenull,
     handleClick() {
       if (typeof this.click === "function")
-        this.click({ value: this.text, column: this.column });
+        this.click({ value: this.resultList, column: this.column });
     },
     handleChange(file, fileList) {
       if (this.autoUpload) {
@@ -199,21 +219,33 @@ export default {
         this.show(file);
       }
       if (typeof this.change === "function")
-        this.change({ value: this.text, column: this.column });
+        this.change({ value: this.resultList, column: this.column, file, fileList });
     },
     handleSuccess(file) {
+      // 如果不自动上传，则将计算url
+      if (!this.autoUpload) {
+        file[this.urlKey] = URL.createObjectURL(file.raw);
+      }
+
       if (this.isArray || this.isString) {
         this.text.push(file[this.urlKey]);
+        this.insideFileList.push(file.raw)
       } else if (this.isPictureImg) {
         this.text.unshift(file[this.urlKey]);
+        this.insideFileList.unshift(file.raw)
       } else {
         let obj = {};
         obj[this.labelKey] = file[this.nameKey];
         obj[this.valueKey] = file[this.urlKey];
         this.text.push(obj);
+        this.insideFileList.push(file.raw)
       }
       this.$message.success("上传成功");
       this.setVal();
+      
+      if (typeof this.uploadSuccess === 'function') {
+        this.uploadSuccess(file, this.column);
+      }
     },
     handleRemove(file, fileList) {
       this.onRemove && this.onRemove(file, fileList);
@@ -224,6 +256,9 @@ export default {
     handleError(msg) {
       console.error(new Error(msg));
       this.$message.error(typeof msg === "string" ? msg : "上传失败");
+      if (typeof this.uploadError === 'function') {
+        this.uploadError(error, this.column);
+      }
     },
     delete(file) {
       if (this.isArray || this.isString) {
@@ -363,23 +398,25 @@ export default {
       }
     },
     setVal() {
-      let result = "";
+      let res = '';
+      let result = this.resultList;
 
       if (this.isString) {
-        result = this.text.join(",");
+        res = result.join(",");
       } else if (this.isPictureImg) {
-        result = this.text[0];
+        res = result[0];
       } else {
-        result = this.text;
+        res = result;
       }
-      this.$emit("input", result);
-      this.$emit("change", result);
+
+      this.$emit("input", res);
+      this.$emit("change", res);
     },
     handleExceed(files, fileList) {
       this.$message.warning(
         `当前限制选择 ${this.limit} 个文件，本次选择了 ${
-          files.length
-        } 个文件，共上传了 ${files.length + fileList.length} 个文件`
+        files.length
+        } 个文件，共上传了 ${fileList.length} 个文件`
       );
     },
     handlePictureCardPreview(file) {
@@ -391,6 +428,7 @@ export default {
         window.open(this.dialogImageUrl);
         return;
       } else {
+        this.initialIndex = this.fileList.map(item => item.url).indexOf(file.url);
         this.dialogImgType = true;
         this.dialogVisible = true;
       }

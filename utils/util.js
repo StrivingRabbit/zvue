@@ -19,13 +19,13 @@ export const miAjax = ({ axios = this.$axios || AXIOS, url, method = 'get', quer
                 axios.get(url, {
                     params: query
                 }).then(res => {
-                    resolve(_.get(res.data, resKey))
+                    resolve(_.get(res.data, resKey) || res.data)
                 }).catch(err => {
                     resolve([]);
                 })
             } else if (method.toLowerCase() === 'post') {
                 axios.post(url, query).then(res => {
-                    resolve(_.get(res.data, resKey))
+                    resolve(_.get(res.data, resKey) || res.data)
                 }).catch(err => {
                     resolve([]);
                 })
@@ -36,30 +36,36 @@ export const miAjax = ({ axios = this.$axios || AXIOS, url, method = 'get', quer
 export const getPasswordChar = (result = '', char) => {
     return result;
 };
-export const findByValue = (dic, value, props, isTree, isGroup, dataType) => {
+export const findByValue = (dic, value, props, isTree, isCascader, isGroup, dataType) => {
     // 如果为空直接返回
     if (validatenull(dic)) return value;
     let result = '';
     props = props || DIC_PROPS;
     if (value instanceof Array) {
         result = [];
-        // 如果是树，则传递整个数组为值
-        if (isTree) {
-            result = findLabelNode(dic, value, props, dataType, isTree) || value;
+        // 如果是级联，则传递整个数组为值
+        if (isCascader) {
+            // 由于项目的级联中，同深度的树的id可能会重复，因此改为从根部匹配id，如果匹配到再向下查找
+            result = findLabelNode(dic, value, props, dataType, isCascader) || value;
         } else {
             // 否则，一层层去查找
             for (let i = 0; i < value.length; i++) {
                 const dicvalue = value[i];
-                result.push(findArrayLabel(dic, dicvalue, props, isGroup, dataType));
+                if (isTree) {
+                    result.push(findLabelNode(dic, dicvalue, props, dataType) || dicvalue);
+                } else {
+                    result.push(findArrayLabel(dic, dicvalue, props, isGroup, dataType));
+                }
             }
         }
         result = result.join(DIC_SPLIT).toString();
     } else if (['string', 'number', 'boolean'].includes(typeof value)) {
-        result = findLabelNode(dic, value, props, dataType, false) || value;
+        result = findLabelNode(dic, value, props, dataType) || value;
     }
     return result;
 };
-export const findLabelNode = (dic, value, props, dataType, isTree) => {
+export const findLabelNode = (dic, value, props, dataType, isCascader) => {
+    // 不可在此处赋值，会造成死循环
     let result;
     let floors = 0;
 
@@ -72,15 +78,16 @@ export const findLabelNode = (dic, value, props, dataType, isTree) => {
             const children = ele[childrenKey] || [];
             if (ele[valueKey] === detailDataType(value1, dataType)) {
                 // 如果是树，则找到root后，递归向下找
-                if (isTree) {
+                if (isCascader) {
+                    // 如果是级联，为了节省性能，需要每一个id匹配
                     result.push(ele[labelKey]);
                     rev(children, value[++floors], props);
                 } else {
                     return result = ele[labelKey];
                 }
-            } else if (!isTree) {
+            } else if (!isCascader) {
                 // 如果不是树也往下遍历，例如只有一个Id需要反显的级联
-                rev(children, value, props);
+                rev(children, value1, props);
             }
         }
     };

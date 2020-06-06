@@ -60,7 +60,8 @@ export default function (type) {
                     name: '',
                     text: undefined,
                     propsHttpDefault: DIC_HTTP_PROPS,
-                    propsDefault: DIC_PROPS
+                    propsDefault: DIC_PROPS,
+                    // displayValue: ''
                 };
             },
             props: {
@@ -177,10 +178,17 @@ export default function (type) {
                 },
                 dicQuery: {
                     type: Object,
-                    default: () => {
-                        return {}
-                    }
+                    default: () => ({})
                 },
+
+                textMode: {
+                    type: Boolean,
+                    default: false
+                },
+                settempDisplayValue: {
+                    type: Function,
+                    default: () => () => { }
+                }
             },
             watch: {
                 value: {
@@ -248,6 +256,14 @@ export default function (type) {
                     });
                 }
             }
+            /* render(h) {
+                console.log("render -> this.textMode", this.textMode)
+                if (this.textMode) {
+                    return h('span', this.displayValue);
+                } else {
+                    return this.$vnode;
+                }
+            }, */
         };
     }
 }

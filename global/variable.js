@@ -8,6 +8,7 @@ export const DIC_PROPS = {
     children: 'children',
     labelText: '名称',
     leaf: 'leaf',
+    isLeaf: 'leaf',
     disabled: 'disabled',
     // table
     rowKey: 'id'
@@ -29,4 +30,5 @@ export const DIC_HTTP_PROPS = {
 };
 export const DIC_GROUP_SPLIT = ' -> ';
 export const DIC_SPLIT = ' | ';
+export const EMPTY_VALUE = '--';
 export const DATE_RANGE_SPLIT = '-';

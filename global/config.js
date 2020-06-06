@@ -13,6 +13,8 @@ export default {
     headerAlign: 'left',
     customTopPosition: 'right',
     indexLabel: "序号",
+    expandWidth: 60,
+    expandFixed: 'left',
     // 默认log
     LOG: {
         error: {

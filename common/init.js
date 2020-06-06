@@ -25,7 +25,8 @@ export default function (type) {
         cascaderDIC: {},
         tableOption: {},
         isMobile: '',
-        initDicTimer: null
+        initDicTimer: null,
+        defaultSize: 'medium'
       };
     },
     created() {
@@ -40,9 +41,9 @@ export default function (type) {
       },
       controlSize() {
         if (isCrud) {
-          return this.tableOption.uiConfig ? this.tableOption.uiConfig.size || 'medium' : 'medium';
+          return this.tableOption.uiConfig ? this.tableOption.uiConfig.size || this.defaultSize : this.defaultSize;
         } else {
-          return this.tableOption.size || 'medium';
+          return this.tableOption.size || this.defaultSize;
         }
       }
     },

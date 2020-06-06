@@ -16,7 +16,6 @@
 </template>
 
 <script>
-
 import props from "../../../common/props";
 import events from "../../../common/events";
 export default {
@@ -30,9 +29,6 @@ export default {
   data() {
     return {};
   },
-  watch: {},
-  created() {},
-  mounted() {},
   computed: {
     active() {
       return this.dic[1] || {};
@@ -40,8 +36,7 @@ export default {
     inactive() {
       return this.dic[0] || {};
     }
-  },
-  methods: {}
+  }
 };
 </script>
 

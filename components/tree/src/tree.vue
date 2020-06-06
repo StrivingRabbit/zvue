@@ -1,84 +1,74 @@
 <template>
   <div>
-    <div v-if="vaildData(option.filter,true)">
-      <el-input placeholder="输入关键字进行过滤" :size="size" v-model="filterText">
+    <div class="avue-tree__filter" v-if="vaildData(options.filter,true)">
+      <el-input clearable placeholder="输入关键字进行过滤" :size="size" v-model="filterText">
         <el-button
           slot="append"
           :size="size"
           @click="parentAdd"
           icon="el-icon-plus"
-          v-if="vaildData(option.addBtn,true)"
+          v-if="vaildData(options.addBtn,false)"
         ></el-button>
-        <template slot="append">
-          <slot name="addBtn"></slot>
-        </template>
       </el-input>
     </div>
-
     <el-tree
       ref="tree"
-      :data="list"
+      v-bind="options"
+      :data="data"
+      :props="props"
+      :icon-class="iconClass"
+      :highlight-current="!options.multiple"
+      :show-checkbox="options.multiple"
       :node-key="nodeKey"
-      :check-strictly="checkStrictly"
       :filter-node-method="filterNode"
       :expand-on-click-node="false"
-      :default-expand-all="defaultExpandAll"
+      @check-change="handleCheckChange"
+      @node-click="nodeClick"
+      @node-contextmenu="nodeContextmenu"
     >
-      <div slot-scope="{ node,data }">
-        <div
-          @click.self="nodeClick(data)"
-          @mouseenter="data.is_show=true"
-          @mouseleave="data.is_show=false"
-        >
-          {{ data[labelKey]}}
-          <div v-show="data.is_show && vaildData(option.menu,true)">
-            <el-dropdown trigger="click">
-              <i class="el-icon-more"></i>
-              <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item
-                  v-if="vaildData(option.addBtn,true)"
-                  @click.native="append(node,data)"
-                >新增</el-dropdown-item>
-                <el-dropdown-item
-                  v-if="vaildData(option.editBtn,true)"
-                  @click.native="edit(node,data)"
-                >修改</el-dropdown-item>
-                <el-dropdown-item
-                  v-if="vaildData(option.delBtn,true)"
-                  @click.native="remove(node,data)"
-                >删除</el-dropdown-item>
-                <slot name="menuBtn" :node="node" :data="data"></slot>
-              </el-dropdown-menu>
-            </el-dropdown>
-          </div>
-        </div>
-      </div>
+      <template v-if="$scopedSlots.default" #default="{node,data}">
+        <slot :node="node" :data="data"></slot>
+      </template>
     </el-tree>
+
+    <transition name="el-zoom-in-top">
+      <div
+        v-if="client.show&&menu"
+        class="el-cascader-panel is-bordered zvue-tree_menu"
+        v-clickout="closeMenu"
+        @click="client.show=false"
+        :style="styleName"
+      >
+        <div class="zvue-tree_item" v-if="vaildData(options.addBtn,false)" @click="rowAdd">新增</div>
+        <div class="zvue-tree_item" v-if="vaildData(options.editBtn,false)" @click="rowEdit">修改</div>
+        <div class="zvue-tree_item" v-if="vaildData(options.delBtn,false)" @click="rowRemove">删除</div>
+        <slot name="menu" :node="node" :Tree="instance"></slot>
+      </div>
+    </transition>
+
     <el-dialog
-      :title="obj[labelKey]"
+      :title="node[labelKey] || title"
       :visible.sync="box"
       modal-append-to-body
       append-to-body
       @close="hide"
-      :width="vaildData(option.dialogWidth,'50%')"
+      :width="vaildData(options.dialogWidth,'50%')"
     >
-      <avue-form v-model="form" :option="formOption" ref="form" @submit="handleSubmit"></avue-form>
+      <z-form v-model="form" :options="formOptions" ref="form" @submit="handleSubmit"></z-form>
     </el-dialog>
   </div>
 </template>
 
 <script>
-
-import { DIC_PROPS } from "../../../global/variable";
-import { deepClone, vaildData } from "../../../utils/util";
+import { DIC_PROPS } from '../../../global/variable';
+import { deepClone, vaildData, setPx, setDefaultValue } from "../../../utils/util";
 export default {
   name: "zTree",
   props: {
-    checkStrictly: {
-      type: Boolean,
-      default: false
+    iconClass: {
+      type: String,
     },
-    option: {
+    options: {
       type: Object,
       default: () => {
         return {};
@@ -97,18 +87,58 @@ export default {
       }
     }
   },
+  data() {
+    return {
+      filterText: "",
+      client: {
+        x: 0,
+        y: 0,
+        show: false
+      },
+      box: false,
+      type: "",
+      node: {},
+      obj: {},
+      form: {},
+      instance: null
+    };
+  },
   computed: {
+    Tree() {
+      return this.$refs.tree
+    },
+    styleName() {
+      return {
+        top: this.setPx(this.client.y - 10),
+        left: this.setPx(this.client.x - 10),
+        boxSizing: 'border-box',
+        padding: '0 10px',
+        boxShadow: '0 2px 12px 0 rgba(0, 0, 0, 0.1)'
+      }
+    },
+    menu() {
+      let hasBtn = !!this.$scopedSlots.menu || this.options.addBtn || this.options.editBtn || this.options.delBtn;
+      return this.vaildData(this.options.menu, true) && hasBtn;
+    },
+    title() {
+      return this.options.title
+    },
     addText() {
-      return this.addFlag ? "添加" : "编辑";
+      return this.addFlag ? "新增" : "编辑";
     },
     addFlag() {
-      return this.type === "add" || this.type === "parentAdd";
+      return ["add", "parentAdd"].includes(this.type);
     },
     size() {
-      return this.option.size || "small";
+      return this.options.size || "small";
     },
     props() {
-      return this.option.props || {};
+      let props = this.options.props;
+      setDefaultValue(DIC_PROPS, props, this);
+      return props;
+    },
+    leafKey() {
+      return this.props.isLeaf || DIC_PROPS.isLeaf
     },
     valueKey() {
       return this.props.value || DIC_PROPS.value;
@@ -122,65 +152,53 @@ export default {
     childrenKey() {
       return this.props.children || DIC_PROPS.children;
     },
-    defaultExpandAll() {
-      return this.vaildData(this.option.expandAll, true);
-    },
     nodeKey() {
-      return this.option.nodeKey || DIC_PROPS.nodeKey;
-    },
-    columnOption() {
-      return this.appednKey(deepClone(this.data || []));
+      return this.props.nodeKey || DIC_PROPS.nodeKey;
     },
     formColumnOption() {
-      return (this.option.formOption || {}).column || [];
+      return (this.options.formOptions || {}).forms || [];
     },
-    formOption() {
+    formOptions() {
       return Object.assign(
         {
           submitText: this.addText,
-          column: [
-            {
-              label: this.labelText,
-              prop: this.labelKey,
-              rules: [
-                {
-                  required: true,
-                  message: `请输入 ${this.labelText}`,
-                  trigger: "blur"
-                }
-              ]
-            },
-            ...this.formColumnOption
+          forms: [{
+            label: this.valueKey,
+            prop: this.valueKey,
+            display: false
+          },
+          {
+            label: this.labelText,
+            prop: this.labelKey,
+            rules: [
+              {
+                required: true,
+                trigger: "blur"
+              }
+            ]
+          },
+          ...this.formColumnOption
           ]
         },
         (() => {
-          let option = this.option.formOption || {};
-          delete option.column;
-          return option;
+          let options = this.options.formOptions || {};
+          delete options.forms;
+          return options;
         })()
       );
     }
   },
-  data() {
-    return {
-      filterText: "",
-      box: false,
-      type: "",
-      node: {},
-      obj: {},
-      form: {},
-      list: []
-    };
-  },
   created() {
     this.vaildData = vaildData;
-    this.list = deepClone(this.columnOption);
+    this.deepClone = deepClone;
+    this.setPx = setPx;
+  },
+  mounted() {
+    this.initFun();
+    this.instance = this.Tree;
   },
   watch: {
-    columnOption() {
-      this.list = deepClone(this.columnOption);
-    },
-    option() {
+    options() {
       this.init();
     },
     filterText(val) {
@@ -193,105 +211,126 @@ export default {
       this.$emit("input", val);
     }
   },
-
   methods: {
+    closeMenu() {
+      this.client.show = false
+    },
+    initFun() {
+      [
+        'filter', 'updateKeyChildren', 'getCheckedNodes', 'setCheckedNodes', 'getCheckedKeys',
+        'setCheckedKeys', 'setChecked', 'getHalfCheckedNodes', 'getHalfCheckedKeys', 'getCurrentKey', 'getCurrentNode',
+        'setCurrentKey', 'setCurrentNode', 'getNode', 'remove', 'append', 'insertBefore', 'insertAfter'
+      ].forEach(ele => {
+        this[ele] = this.$refs.tree[ele];
+      })
+    },
+    nodeContextmenu(e, data) {
+      this.node = this.deepClone(data);
+      this.client.x = e.clientX;
+      this.client.y = e.clientY;
+      this.client.show = true;
+    },
+    handleCheckChange(data, checked, indeterminate) {
+      this.$emit('check-change', data, checked, indeterminate)
+    },
     handleSubmit(form, done) {
-      this.addFlag ? this.save(form, done) : this.update(form, done);
+      this.addFlag ? this.save(form, done) : this.update(form, done)
     },
-    appednKey(list) {
-      list.forEach(ele => {
-        ele.is_show = false;
-        if (ele[this.childrenKey]) {
-          this.appednKey(ele[this.childrenKey]);
-        }
-      });
-      return list;
-    },
-    nodeClick(data) {
-      this.$emit("node-click", data);
+    nodeClick(data, node, $tree) {
+      this.$emit("node-click", data, node, $tree);
     },
     filterNode(value, data) {
+      if (typeof this.options.filterNode === 'function') {
+        return this.options.filterNode(value, data);
+      }
       if (!value) return true;
       return data[this.labelKey].indexOf(value) !== -1;
     },
     hide() {
       this.box = false;
-      this.node = {};
-      this.obj = {};
       this.$refs.form.resetForm();
       this.$refs.form.clearValidate();
     },
     save(data, done) {
       const callback = () => {
-        const form = deepClone(Object.assign(this.form, { is_show: false }));
+        let form = this.deepClone(this.form);
         if (this.type === "add") {
-          if (!this.obj[this.childrenKey]) {
-            this.$set(this.obj, "children", []);
-          }
-          this.obj.children.push(form);
-        } else if (this.type === "parentAdd") this.obj.push(form);
+          this.$refs.tree.append(form, this.node[this.valueKey])
+        } else if (this.type === "parentAdd") {
+          this.$refs.tree.append(form)
+        }
         this.hide();
-        done();
+        done()
       };
-      this.$emit("save", this.obj, this.node, callback, done);
+      this.$emit("save", data, callback, done);
     },
     update(data, done) {
       const callback = () => {
-        const parent = this.node.parent;
-        const children = parent.data[this.childrenKey] || parent.data;
-        const index = children.findIndex(
-          item => item[this.nodeKey] === this.form[this.nodeKey]
-        );
-        children.splice(index, 1, this.form);
+        let node = this.$refs.tree.getNode(this.node[this.valueKey]);
+        let form = this.deepClone(this.form);
+        node.data = form
         this.hide();
-        done();
+        done()
       };
-      this.$emit("update", this.obj, this.node, callback, done);
+      this.$emit("update", data, callback, done);
     },
-
-    edit(node, data) {
+    rowEdit(a) {
       this.type = "edit";
-      this.node = node;
-      this.obj = data;
-      this.form = deepClone(this.obj);
+      this.form = this.node;
       this.show();
     },
-    parentAdd(data) {
+    parentAdd() {
       this.type = "parentAdd";
-      this.obj = this.list;
       this.show();
     },
-    append(node, data) {
+    rowAdd() {
       this.type = "add";
-      this.obj = data;
-      this.node = node;
       this.show();
     },
     show() {
+      this.client.show = false;
       this.box = true;
-      setTimeout(() => {
-        this.$refs.form.clearValidate();
-      }, 0);
     },
-    remove(node, data) {
-      this.obj = data;
-      this.node = node;
+    rowRemove() {
+      this.client.show = false;
+
       const callback = () => {
-        const parent = node.parent;
-        const children = parent.data.children || parent.data;
-        const index = children.findIndex(d => d.id === data.id);
-        children.splice(index, 1);
-      };
+        this.$refs.tree.remove(this.node[this.valueKey])
+      }
+
       this.$confirm("是否删除改节点?", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
         type: "warning"
       })
         .then(() => {
-          this.$emit("del", this.obj, this.node, callback);
+          this.$emit("del", this.node, callback);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }
 };
 </script>
+<style lang="less" scoped>
+.zvue-tree_menu {
+  width: 200px;
+  position: fixed;
+  z-index: 1024;
+  flex-wrap: wrap;
+  background-color: #fff;
+}
+/deep/ .zvue-tree_item {
+  height: 34px;
+  line-height: 34px;
+  outline: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  width: 100%;
+  color: #666;
+
+  &:hover {
+    cursor: pointer;
+    color: #409eff;
+  }
+}
+</style>

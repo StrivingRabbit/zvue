@@ -6,9 +6,14 @@
     :min="min"
     :max="max"
     :range="range"
+    :show-tooltip="showTooltip"
     :show-stops="showStops"
     :show-input="showInput"
     :format-tooltip="formatTooltip"
+    :marks="marks"
+    :vertical="vertical"
+    :debounce="debounce"
+    :tooltip-class="tooltipClass"
     @click.native="handleClick"
     @change="handleChange"
   ></el-slider>
@@ -36,6 +41,10 @@ export default {
       type: Boolean,
       default: false
     },
+    showTooltip: {
+      type: Boolean,
+      default: true
+    },
     showInput: {
       type: Boolean,
       default: false
@@ -44,14 +53,20 @@ export default {
       type: Boolean,
       default: false
     },
-    formatTooltip: Function
+    formatTooltip: Function,
+    marks: {},
+    vertical: {
+      type: Boolean
+    },
+    debounce: {},
+    tooltipClass: {}
   },
   data() {
     return {};
   },
   watch: {},
-  created() {},
-  mounted() {},
+  created() { },
+  mounted() { },
   methods: {}
 };
 </script>

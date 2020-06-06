@@ -1,5 +1,5 @@
 <template>
-  <div class="zvue-table-wrapper" :style="{height:wrapperHeight}">
+  <div class="zvue-table-wrapper" :style="{height:wrapperHeight,width:setPx(parentOption.width)}">
     <div
       v-if="options.customTop || $scopedSlots['custom-top']"
       ref="customTop"
@@ -21,6 +21,8 @@
         cell-class-name="zvue-table-cell"
         ref="dataBaseTable"
         :row-key="rowKey"
+        :expand-row-keys="parentOption.expandRowKeys || expandList"
+        :default-expand-all="parentOption.defaultExpandAll"
         :row-style="config.rowStyle"
         :cell-style="config.cellStyle"
         :header-cell-style="config.headerCellStyle"
@@ -28,7 +30,9 @@
         :data="tableShowData"
         :height="tableHeight"
         :size="controlSize"
+        :show-header="options.showHeader"
         @current-change="_currentChange"
+        @expand-change="_expandChagne"
         @row-click="rowClick"
         @row-dblclick="rowDblclick"
         @sort-change="sortChange"
@@ -36,6 +40,19 @@
         @selection-change="selectionChange"
         @select="select"
       >
+        <!-- 折叠面板  -->
+        <el-table-column
+          type="expand"
+          align="center"
+          v-if="parentOption.expand"
+          :width="parentOption.expandWidth || config.expandWidth"
+          :fixed="vaildData(parentOption.expandFixed,config.expandFixed)"
+        >
+          <template #default="{row,index}">
+            <slot :row="row" :index="index" name="expand"></slot>
+          </template>
+        </el-table-column>
+
         <!-- 多选 -->
         <el-table-column
           v-if="uiConfig.selection"
@@ -57,17 +74,16 @@
         >
           <template slot="header">{{uiConfig.showIndex.label || config.indexLabel}}</template>
         </el-table-column>
+
         <!-- 解决使用column组件多选索引顺序错位 -->
         <el-table-column width="1px"></el-table-column>
-
         <column :columnConfig="columnConfig">
           <template v-for="col in columnConfig" slot-scope="{column}" :slot="`${col.prop}Header`">
             <slot :name="`${col.prop}Header`" :column="column"></slot>
           </template>
           <template
             v-for="col in columnConfig"
-            :slot="col.prop"
-            slot-scope="{scopeRow,label,row,size,column,disabled,isEdit,dic}"
+            #[col.prop]="{scopeRow,label,row,size,column,disabled,isEdit,dic}"
           >
             <slot :name="col.prop" v-bind="{scopeRow,label,row,size,column,disabled,isEdit,dic}"></slot>
           </template>
@@ -76,19 +92,19 @@
         <!-- 列操作 -->
         <el-table-column
           v-if="btnConfig"
-          :fixed="btnConfig.fixed"
+          :fixed="btnConfig.fixed || 'right'"
           :prop="btnConfig.prop"
           :label="btnConfig.label"
           :width="btnConfig.width"
-          :align="btnConfig.align || options.align || config.align"
-          :header-align="btnConfig.headerAlign || config.headerAlign"
+          :align="btnConfig.align || options.align || 'center'"
+          :header-align="btnConfig.headerAlign || 'center'"
         >
           <!-- 搜索框 -->
           <template v-if="uiConfig.searchable" slot="header">
             <el-input v-model="searchVal" :size="controlSize" placeholder="检索" />
           </template>
           <!-- 按钮 -->
-          <template slot-scope="scopeRow">
+          <template #default="scopeRow">
             <!-- 编辑按钮 -->
             <el-button
               type="text"
@@ -105,7 +121,7 @@
             >取 消</el-button>
             <!-- 操作列的slot -->
             <slot
-              v-if="options.operation || $scopedSlots.operation"
+              v-if="vaildData(parentOption.operation,!!$scopedSlots.operation)"
               :name="config.operationSlotName"
               :scopeRow="scopeRow"
               :row="scopeRow.row"
@@ -155,7 +171,16 @@
           :total="uiConfig.pagination.total || tableData.length"
           :handleSizeChange="_handleSizeChange"
           :handleCurrentChange="_handleCurrentChange"
-        />
+        >
+          <template #default>
+            <slot
+              :currentPage="paginationObj.currentPage"
+              :pageSize="paginationObj.pageSize"
+              :total="uiConfig.pagination.total || tableData.length"
+              name="pagination"
+            ></slot>
+          </template>
+        </z-pagination>
       </div>
     </div>
   </div>
@@ -172,7 +197,8 @@ import {
   deepClone,
   vaildData,
   vaildBoolean,
-  setDefaultValue
+  setDefaultValue,
+  setPx
 } from "../../../utils/util";
 import { detail } from "../../../utils/detail";
 import { DIC_SPLIT } from "../../../global/variable";
@@ -182,7 +208,7 @@ let dblclickTimer = null;
 let paginationTimer = null;
 
 //点击事件屏蔽列
-let preventClick = ["selection", "operation"];
+let preventClick = ["selection", "operation", "img"];
 
 export default {
   name: "zTable",
@@ -224,7 +250,10 @@ export default {
       formRules: {},
       formCellRules: {},
       formCascaderList: [],
-      formIndexList: []
+      formIndexList: [],
+      currentRowData: [], // 当前选中行
+      lastCurrentRowData: [], // 上一选中行
+      expandList: []  // 展开的列
     };
   },
   created() {
@@ -243,6 +272,9 @@ export default {
 
     //服务器模式
     this.isServerMode = options.serverMode;
+
+    // 折叠
+    this.expandList.concat(this.options.expandedRows);
 
     //ui配置处理
     if (options.uiConfig && options.uiConfig.pagination === true) {
@@ -264,6 +296,7 @@ export default {
     validatenull,
     asyncValidator,
     vaildBoolean,
+    setPx,
     /**
      * 内部使用方法
      */
@@ -274,7 +307,8 @@ export default {
         this._loadServerMode(this.isServerMode.data);
       } else {
         //如果是刷新表格，如果data为空，说明是在外部使用ajax请求数据，则出现加载动画，3秒后加载动画关闭
-        if (reload || !this.options.data || this.options.data.length === 0) {
+        //  || !this.options.data || this.options.data.length === 0
+        if (reload) {
           this.loading = true;
           setTimeout(() => {
             this.loading = false;
@@ -282,6 +316,7 @@ export default {
         }
 
         this._setTableData(this.options.data);
+        this.setTotal(this.options.data.length);
       }
     },
     // 检索
@@ -365,7 +400,7 @@ export default {
       })
         .then(res => {
           this._setTableData(res[this.listKey]);
-          this.setPaginationTotal(res[this.totalKey]);
+          this.setTotal(res[this.totalKey]);
         })
         .finally(() => {
           //加载中结束
@@ -431,27 +466,19 @@ export default {
       } else {
         this.tableData = data;
         // 在本地模式下，重新赋值后，重设total 会造成请求完后设置total无效
-        // this.setPaginationTotal(data.length);
+        // this.setTotal(data.length);
       }
       this.allData = data;
       // 设置总页数为null，这样在数据更新后没有手动设置total，会自动读取数据长度
-      // this.setPaginationTotal(null);
+      // this.setTotal(null);
     },
     //分页模式，每页显示数量变化时触发
     _handleSizeChange(pageSize) {
       this.pageSize = pageSize;
-      this._handlerPagination(pageSize, this.currentPage);
     },
     //分页模式，切换页时触发
     _handleCurrentChange(currentPage) {
       this.currentPage = currentPage;
-      this._handlerPagination(this.pageSize, currentPage);
-    },
-    // 分页点击调用
-    _handlerPagination(pageSize, currentPage) {
-      this.uiConfig.pagination.handler &&
-        this.uiConfig.pagination.handler(pageSize, currentPage, this);
-      this.$emit("handle-pagination", pageSize, currentPage, this);
     },
     // 当前行是否可多选
     _selectable(row, index) {
@@ -465,6 +492,21 @@ export default {
     _currentChange(currentRow, oldCurrentRow) {
       this.currentRowData = currentRow;
       this.lastCurrentRowData = oldCurrentRow;
+
+      this.$emit("current-change", currentRow, oldCurrentRow);
+    },
+    _expandChagne(row, expandedRows) {
+      this.$emit("expand-change", row, expandedRows);
+
+      // 手风琴模式，只展开一个
+      if (this.parentOption.expandOne) {
+        this.toggleRowExpansion();
+        if (expandedRows.length) {
+          (this.parentOption?.expandRowKeys || this.expandList).push(row[this.rowKey]);
+        }
+      } else {
+        this.expandList = [...expandedRows];
+      }
     },
 
     /**
@@ -625,7 +667,7 @@ export default {
         return;
       }
 
-      this.$refs.dataBaseTable.setCurrentRow(this.tableShowData[index]);
+      this.Table.setCurrentRow(this.tableShowData[index]);
     },
     //多选选择当前项
     toggleSelection(rowsIndex, selectedArr) {
@@ -637,27 +679,69 @@ export default {
         return;
       }
       /**
-       * rowsIndex为  [0,2,5]形式的行标号
-       * selectedArr为 [true,false]形式的boolean数组，表明对应行选中与否
+       * rowsIndex为  [0,2,5]形式的行标号 或 [row,row,row] 或 0 或 row
+       * selectedArr为 [true,false] 或 true 形式的boolean数组，表明对应行选中与否
        */
-      if (selectedArr) {
-        for (let index = 0; index < rowsIndex.length; index++) {
-          const row = this.tableShowData[rowsIndex[index]];
-          const rowSelected = selectedArr[index];
-          if (!row) continue;
-          this.$refs.dataBaseTable.toggleRowSelection(row, rowSelected);
+      if (rowsIndex) {
+        // 如果选中状态时数组
+        if (Array.isArray(rowsIndex)) {
+          for (let index = 0; index < rowsIndex.length; index++) {
+            const row = typeof rowsIndex[index] === 'number'
+              ? this.tableShowData[rowsIndex[index] - 1]
+              : rowsIndex[index];
+            const rowSelected = Array.isArray(selectedArr)
+              ? selectedArr[index]
+              : selectedArr;
+            if (!row) continue;
+
+            this.Table.toggleRowSelection(row, rowSelected);
+          }
+        } else {
+          const row = typeof rowsIndex === 'number'
+            ? this.tableShowData[rowsIndex[index] - 1]
+            : rowsIndex;
+
+          this.Table.toggleRowSelection(row, selectedArr);
         }
       } else {
-        for (let index = 0; index < rowsIndex.length; index++) {
-          const row = this.tableShowData[rowsIndex[index]];
-          if (!row) continue;
-          this.$refs.dataBaseTable.toggleRowSelection(row);
-        }
+        this.clearSelection();
       }
     },
     //多选切换全选状态
     toggleAllSelection() {
-      this.$refs.dataBaseTable.toggleAllSelection();
+      this.Table.toggleAllSelection();
+    },
+    //用于可展开表格与树形表格
+    toggleRowExpansion(rowsIndex, expanded) {
+      if (this.loading) {
+        this._pushInMethodsQueue(this.toggleRowExpansion, [rowsIndex, expanded]);
+        return;
+      }
+
+      if (rowsIndex) {
+        if (Array.isArray(rowsIndex)) {
+          for (let index = 0; index < rowsIndex.length; index++) {
+            const curRowExpanded = Array.isArray(expanded)
+              ? expanded[index]
+              : expanded;
+            const row = typeof rowsIndex[index] === 'number'
+              ? this.tableShowData[rowsIndex[index] - 1]
+              : rowsIndex[index];
+            if (!row) continue;
+
+            this.Table.toggleRowExpansion(row, curRowExpanded);
+          }
+        } else {
+          const row = typeof rowsIndex === 'number'
+            ? this.tableShowData[rowsIndex - 1]
+            : rowsIndex;
+
+          this.Table.toggleRowExpansion(row, expanded);
+        }
+      } else {
+        // 此处关联着options.expandRowKyes，改变都改变
+        (this.options?.expandRowKeys || this.expandList).length = 0;
+      }
     },
     //点击排序触发
     sortChange(sortObj) {
@@ -714,24 +798,22 @@ export default {
     },
     //多选清除选择项
     clearSelection() {
-      this.$refs.dataBaseTable.clearSelection();
+      this.Table.clearSelection();
     },
     //重新布局
     doLayout() {
-      this.$refs.dataBaseTable.doLayout();
+      this.Table.doLayout();
       this.key++;
     },
     // 清除排序
     clearSort() {
-      this.$refs.dataBaseTable.clearSort();
+      this.Table.clearSort();
       this.tableData = this.allData;
     },
     // 清除过滤
     clearFilter(columnKey) {
-      this.$refs.dataBaseTable.clearFilter(columnKey);
+      this.Table.clearFilter(columnKey);
     },
-    //以下方法未添加
-    toggleRowExpansion() { },
 
     /**
      * 外部调用方法
@@ -765,7 +847,7 @@ export default {
       this._setTableData(data);
     },
     // 设置分页每页显示条数
-    setPaginationPageSize(pageSize) {
+    setPageSize(pageSize) {
       this.pageSize = pageSize;
     },
     // 设置分页显示当前第几页
@@ -773,7 +855,7 @@ export default {
       this.currentPage = pageNum;
     },
     // 设置数据总条数，计算页数使用
-    setPaginationTotal(totalNum) {
+    setTotal(totalNum) {
       if (typeof this.uiConfig.pagination === "object") {
         this.uiConfig.pagination.total = totalNum;
       }
@@ -817,6 +899,9 @@ export default {
     }
   },
   computed: {
+    Table() {
+      return this.$refs.dataBaseTable;
+    },
     columnConfig: {
       get() {
         if (this.options.columnConfig) {
@@ -907,8 +992,11 @@ export default {
     }
   },
   watch: {
-    load(newVal) {
-      this.loading = newVal;
+    load: {
+      immediate: true,
+      handler(newVal) {
+        this.loading = newVal;
+      }
     },
     //开启服务器模式且已经加载完毕，执行已经保存的方法队列
     loading(val) {
@@ -917,7 +1005,7 @@ export default {
           this.methodsQueue.forEach(element => {
             element.fn.apply(this, element.params);
           });
-          // this.methodsQueue = [];如果在这里清除，调用刷新方法后无法再次执行
+          // this.methodsQueue = []; // 如果在这里清除，调用刷新方法后无法再次执行
         });
       }
     },
@@ -936,15 +1024,19 @@ export default {
     paginationObj: {
       deep: true,
       handler: function (newVal, oldVal) {
-        // 如果有handler，则拦截分页方法。为了兼容服务端自己写请求数据方法
-        if (this.uiConfig.pagination.handler) {
-          return;
-        }
         // oldVal.pageSize != Number.POSITIVE_INFINITY
         if (Number.isFinite(oldVal.pageSize)) {
           //为防止在极短的时间内重复请求
           clearTimeout(paginationTimer);
           paginationTimer = setTimeout(() => {
+            // 如果有handler，则拦截分页方法。为了兼容服务端自己写请求数据方法
+            if (this.uiConfig.pagination.handler) {
+              this.uiConfig.pagination.handler(newVal.pageSize, newVal.currentPage, this);
+              return;
+            }
+            // 触发pagination方法
+            this.$emit("handle-pagination", newVal.pageSize, newVal.currentPage, this);
+            // 加载分页
             this._getPatinationData();
           }, 0);
         }
@@ -959,7 +1051,7 @@ export default {
       if (newVal instanceof Array) {
         this._getPatinationData();
         //加载中结束
-        this.loading = false;
+        // this.loading = false;
       } else {
         this.$notify({
           type: "error",
@@ -1026,6 +1118,10 @@ export default {
       .el-icon--right {
         margin-left: 0;
       }
+    }
+    // 空表头空数据1px问题解决
+    .el-table__empty-block {
+      width: 100% !important;
     }
   }
   // 分页

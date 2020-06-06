@@ -2,13 +2,21 @@
   <span>
     <!-- 正常列 -->
     <template v-for="col in columnConfig">
+      <multi-header-column
+        v-if="col.children && col.children.length"
+        :key="col.prop"
+        :col="col"
+        :align="col.align || parentOption.align || config.align"
+        :header-align="col.headerAlign || parentOption.headerAlign || config.headerAlign"
+      ></multi-header-column>
       <el-table-column
-        v-if="!col.hide"
+        v-else-if="!col.hide"
         show-overflow-tooltip
-        :key="col.label"
+        :key="col.prop"
         :prop="col.prop"
         :label="col.label"
         :width="col.width"
+        :min-width="col.minWidth"
         :fixed="col.fixed"
         :sortable="col.sortable || false"
         :align="col.align || parentOption.align || config.align"
@@ -18,7 +26,7 @@
         <template v-if="col.headerSlot" slot="header">
           <slot :name="`${col.prop}Header`" :column="col"></slot>
         </template>
-        <template slot-scope="scopeRow">
+        <template #default="scopeRow">
           <slot
             v-if="col.slot"
             :name="col.prop"
@@ -41,6 +49,7 @@
             :upload-before="col.uploadBefore"
             :upload-after="col.uploadAfter"
             :disabled="col.disabled"
+            :textMode="col.textMode"
             @click.native.stop
           ></form-temp>
           <template v-else>
@@ -56,6 +65,16 @@
                 disabled
               />
             </span>
+            <span :style="{display:'flex'}" v-else-if="['img'].includes(col.type)">
+              <z-img v-model="scopeRow.row[col.prop]" :load="col.load" :error="col.error">
+                <!-- <template #placeholder="scope">
+                  <slot :name="`${col.prop}Placeholder`" :scope="scope"></slot>
+                </template>
+                <template #error="scope">
+                  <slot :name="`${col.prop}Error`" :scope="scope"></slot>
+                </template>-->
+              </z-img>
+            </span>
             <span v-else v-html="_columnFormatter(scopeRow,col)"></span>
           </template>
         </template>
@@ -67,11 +86,18 @@
 import { detail } from "../../utils/detail";
 import { validatenull } from "../../utils/validate";
 import formTemp from "../formtemp";
-import { DIC_SPLIT } from "../../global/variable";
+import { DIC_SPLIT, EMPTY_VALUE } from "../../global/variable";
+import multiHeaderColumn from './multiHeaderColumn';
+import zImg from './z-img';
 
 export default {
   name: "column",
   inject: ["crud"],
+  provide() {
+    return {
+      multiColumn: this
+    }
+  },
   props: {
     columnConfig: {
       type: Array,
@@ -79,7 +105,7 @@ export default {
       default: []
     }
   },
-  components: { formTemp },
+  components: { formTemp, multiHeaderColumn, zImg },
   data() {
     return {
       DIC: this.crud.DIC,
@@ -117,7 +143,7 @@ export default {
     _globalColumnFormatter(row, column, currentColumn) {
       let value = row[column.property];
       if (this.validatenull(value)) {
-        return "--";
+        return EMPTY_VALUE;
       }
       return this.handleDetail(
         row,
@@ -128,7 +154,7 @@ export default {
     handleDetail(row, column, DIC) {
       let result = row[column.prop];
 
-      if (typeof column.type === "undefined") return result || "-";
+      if (typeof column.type === "undefined") return result;
       // 如果是级联，切值为字符串，则需要对值进行处理
       if (column.type === "cascader" && typeof result === "string") {
         let list = result.split(",");

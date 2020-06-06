@@ -87,6 +87,8 @@ export const initVal = ({ listType, type, multiple, dataType, value, curentForm 
         if (listType === 'picture-img' && type === 'upload') {
             if (typeof value === 'string' && value.trim().length > 0) {
                 value = [value];
+            } else if (curentForm.autoUpload === false && value instanceof File) {
+                value = [URL.createObjectURL(value)];
             } else {
                 value = [];
             }
@@ -199,15 +201,11 @@ export const formInitVal = (list = []) => {
     let tableForm = {};
     let searchForm = {};
     list.forEach(ele => {
+        if (ele.notModel) return;
         if (
-            ele.type === 'checkbox' ||
-            ele.type === 'cascader' ||
-            ele.type === 'dynamic' ||
-            ele.type === 'dates' ||
+            ['checkbox', 'cascader', 'dynamic', 'dates'].includes(ele.type) ||
             (ele.type === 'upload' && ele.listType !== 'picture-img') ||
-            ele.multiple ||
-            ele.range ||
-            ele.dataType === 'array'
+            ele.multiple || ele.range || ele.dataType === 'array'
         ) {
             tableForm[ele.prop] = [];
             if (ele.search) searchForm[ele.prop] = [];
@@ -218,6 +216,11 @@ export const formInitVal = (list = []) => {
             tableForm[ele.prop] = undefined;
             if (ele.search) {
                 searchForm[ele.prop] = undefined;
+            }
+        } else if (['switch'].includes(ele.type) || ele.dataType === 'boolean') {
+            tableForm[ele.prop] = false;
+            if (ele.search) {
+                searchForm[ele.prop] = false;
             }
         } else {
             tableForm[ele.prop] = '';
@@ -243,3 +246,13 @@ export const formInitVal = (list = []) => {
         searchForm
     };
 };
+
+// 将数据设置到Form的modelTranslate
+export const setModelTranslate = (vm, prop, value) => {
+    let Form = vm;
+    while (Form && !Form.modelTranslate) {
+        Form = Form.$parent;
+    }
+    // displayValue
+    Form.$set(Form.modelTranslate, `$${prop}`, value);
+}

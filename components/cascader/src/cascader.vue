@@ -21,7 +21,7 @@
       @focus="handleFocus"
       @click.native="handleClick"
     >
-      <template slot-scope="{ node, data }">
+      <template #default="{ node, data }">
         <slot
           v-if="typeslot"
           :name="`${prop}Type`"
@@ -40,6 +40,7 @@
 
 // :change-on-select="changeOnSelect"  :expand-trigger="expandTrigger"
 import { validatenull } from "../../../utils/validate";
+import { setModelTranslate } from "../../../utils/dataformat";
 import props from "../../../common/props";
 import events from "../../../common/events";
 import { DIC_SPLIT } from "../../../global/variable";
@@ -56,7 +57,7 @@ export default {
       lazyTimer: null,
       runLazyTimer: false,
       expandchage: false,
-      runHandleChange: false
+      runHandleChange: false,
     };
   },
   props: {
@@ -82,12 +83,13 @@ export default {
     },
     collapseTags: {
       type: Boolean,
-      default: true
+      default: false
     },
     isCrud: {
       type: Boolean,
       default: false
-    }
+    },
+    settempDisplayValue: Function
   },
   methods: {
     getTreeData(dic) {
@@ -132,17 +134,20 @@ export default {
         elCascaderPanel.lazyLoad();
       }
     },
-    findParentForm(current, cb) {
-      if (!current.modelTranslate) {
-        this.findParentForm(current.$parent, cb);
-      } else {
-        cb && cb(current);
-      }
-    },
     setFromModelTranslate(presentText) {
-      this.findParentForm(this, zForm => {
-        this.$set(zForm.modelTranslate, `$${this.column.prop}`, presentText);
-      });
+      presentText = presentText.split(this.separator || "\\").join(DIC_SPLIT);
+
+      if (this.isCrud) {
+        this.$set(this.column, "presentText", presentText);
+      } else {
+        // 赋值到modelTranslate
+        setModelTranslate(this, this.prop, presentText);
+      }
+
+      // 如果是懒加载，需要在此处进行displayValue赋值
+      if (this.props.lazy) {
+        this.settempDisplayValue(presentText);
+      }
     }
   },
   watch: {
@@ -180,14 +185,24 @@ export default {
     this.createdTimeStamp = _.now();
   },
   mounted() {
+    // tags的处理
+    this.$refs["cascader"].$watch("presentTags", (newVal, oldVal) => {
+      if (newVal instanceof Array) {
+        newVal = newVal.map(item => _.last(item.text.split(this.separator))).join(DIC_SPLIT);
+      }
+      this.setFromModelTranslate(newVal);
+    });
+
+    // 级联反显的处理
     this.$refs["cascader"].$watch("presentText", (newVal, oldVal) => {
       if (typeof newVal !== "string") {
         newVal = "";
       }
-      if (this.isCrud) {
-        newVal = newVal.split(this.separator || "\\").join(DIC_SPLIT);
-        this.$set(this.column, "presentText", newVal);
-      } else {
+      newVal = newVal.trim();
+      if (newVal.length) {
+        if (this.showAllLevels === false) {
+          newVal = _.last(newVal.split(DIC_SPLIT));
+        }
         // 赋值到modelTranslate
         this.setFromModelTranslate(newVal);
       }

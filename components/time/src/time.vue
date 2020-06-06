@@ -12,6 +12,8 @@
     :clearable="disabled?false:clearable"
     :value-format="valueFormat"
     :placeholder="placeholder"
+    :picker-options="pickerOptions"
+    :arrow-control="arrowControl"
     @change="handleChange"
     @click.native="handleClick"
     :disabled="disabled"
@@ -19,7 +21,6 @@
 </template>
 
 <script>
-
 import props from "../../../common/props";
 import events from "../../../common/events";
 // import locale from "../../../../../../core/common/locale";
@@ -28,7 +29,7 @@ export default {
   mixins: [props(), events()],
   data() {
     return {
-      text: "",
+      text: ""
     };
   },
   props: {
@@ -54,10 +55,18 @@ export default {
     },
     format: {
       default: ""
+    },
+    pickerOptions: {
+      type: Object,
+      default: () => ({})
+    },
+    arrowControl: {
+      type: Boolean,
+      default: false
     }
   },
   computed: {
-    isRange () {
+    isRange() {
       return this.type === "timerange";
     }
   }

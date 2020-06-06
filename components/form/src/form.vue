@@ -1,9 +1,10 @@
 <template>
   <div class="zvue-form-wrapper" :style="{width:setPx(parentOption.width,'100%')}">
     <el-form
+      v-loading="load"
       :ref="formRef"
       :status-icon="vaildData(parentOption.statusIcon,false)"
-      :label-suffix="parentOption.labelSuffix || '：'"
+      :label-suffix="parentOption.labelSuffix || ':'"
       :rules="formRules"
       :model="model"
       :size="controlSize"
@@ -24,7 +25,7 @@
           :label="group.label"
           :card="parentOption.card"
         >
-          <template slot="header" v-if="$slots[group.prop+'Header']">
+          <template #header v-if="$slots[group.prop+'Header']">
             <slot :name="`${group.prop}Header`"></slot>
           </template>
           <div class="zvue-form-group">
@@ -40,7 +41,7 @@
                 v-if="vaildDisplay(column)"
               >
                 <el-form-item
-                  :class="[_.isEmpty(column.label)?'zvue-form-item_emptylabel' : '']"
+                  :class="[validatenull(column.label)?'zvue-form-item_emptylabel' : '']"
                   :label="column.label"
                   :prop="column.prop"
                   :required="column.required"
@@ -48,13 +49,15 @@
                   :show-message="column.showMessage"
                   :inline-message="column.inlineMessage"
                   :size="column.size || controlSize"
-                  :label-width="setPx(column.width,parentOption.labelWidth || 90)"
+                  :label-width="setPx(column.width,validatenull(parentOption.labelWidth) ? 90 : parentOption.labelWidth)"
                 >
                   <!-- 自定义label -->
-                  <template slot="label" v-if="column.labelslot">
+                  <template #label v-if="column.labelslot">
                     <slot
+                      v-bind="slotProps"
                       :name="column.prop+'Label'"
                       :column="column"
+                      :label="column.label"
                       :value="model[column.prop]"
                       :disabled="vaildDiabled(column,group)"
                       :size="column.size || controlSize"
@@ -62,8 +65,9 @@
                     ></slot>
                   </template>
                   <!-- 自定义error -->
-                  <template slot="error" slot-scope="{error}" v-if="column.errorslot">
+                  <template #error="{error}" v-if="column.errorslot">
                     <slot
+                      v-bind="slotProps"
                       :name="column.prop+'Error'"
                       :column="column"
                       :error="error"
@@ -80,16 +84,20 @@
                     :content="vaildData(column.tip,getPlaceholder(column))"
                     :placement="column.tipPlacement"
                   >
-                    <span v-if="textMode">{{displayText(column)}}</span>
+                    <!-- <span
+                      v-if="textMode && !['dynamic','upload'].includes(column.type)"
+                    >{{displayText(column)}}</span>-->
                     <slot
                       v-if="column.formslot"
+                      v-bind="slotProps"
                       :name="column.prop"
                       :value="model[column.prop]"
                       :column="column"
                       :label="model['$'+column.prop]"
                       :size="column.size || controlSize"
-                      :disabled="vaildDiabled(column,group)"
                       :dic="DIC[column.prop]"
+                      :disabled="vaildDiabled(column,group)"
+                      :textMode="vaildTextMode(column,group)"
                     ></slot>
                     <form-temp
                       v-else
@@ -98,7 +106,11 @@
                       :dic="DIC[column.prop]"
                       :upload-before="uploadBefore"
                       :upload-after="uploadAfter"
+                      :upload-success="uploadSuccess"
+                      :upload-error="uploadError"
+                      :size="controlSize"
                       :disabled="vaildDiabled(column,group)"
+                      :textMode="vaildTextMode(column,group)"
                     >
                       <!-- 自定义表单里内容 -->
                       <template
@@ -108,34 +120,33 @@
                       >
                         <slot
                           :name="`${column.prop}Type`"
+                          v-bind="slotProps"
                           :size="column.size || controlSize"
                           :item="item"
                           :labelkey="labelkey"
                           :valuekey="valuekey"
                           :childrenkey="childrenkey"
                           :node="node"
+                          :disabled="vaildDiabled(column,group)"
+                          :textMode="vaildTextMode(column,group)"
                         ></slot>
                       </template>
                       <!-- input的slot处理 -->
-                      <template
-                        v-if="column.prependslot"
-                        :slot="column.prependslot"
-                        slot-scope="{prependClick}"
-                      >
+                      <template v-if="column.prependslot" #[column.prependslot]="{prependClick}">
                         <slot
                           :name="column.prependslot"
+                          v-bind="slotProps"
                           :disabled="vaildDiabled(column,group)"
+                          :textMode="vaildTextMode(column,group)"
                           :clickevent="prependClick"
                         ></slot>
                       </template>
-                      <template
-                        v-if="column.appendslot"
-                        :slot="column.appendslot"
-                        slot-scope="{appendClick}"
-                      >
+                      <template v-if="column.appendslot" #[column.appendslot]="{appendClick}">
                         <slot
                           :name="column.appendslot"
+                          v-bind="slotProps"
                           :disabled="vaildDiabled(column,group)"
+                          :textMode="vaildTextMode(column,group)"
                           :clickevent="appendClick"
                         ></slot>
                       </template>
@@ -173,7 +184,7 @@
                 v-if="vaildData(parentOption.emptyBtn,true)"
                 @click="resetForm"
               >{{vaildData(parentOption.emptyText,'清 空')}}</el-button>
-              <slot name="menuBtn" :disabled="allDisabled" :size="controlSize"></slot>
+              <slot name="menuBtn" v-bind="slotProps"></slot>
             </div>
           </el-form-item>
         </el-col>
@@ -182,7 +193,6 @@
   </div>
 </template>
 <script>
-
 import {
   deepClone,
   vaildData,
@@ -203,8 +213,8 @@ import formTemp from "../../formtemp";
 import { validatenull } from "../../../utils/validate";
 import { detail } from "../../../utils/detail";
 
-const setDefaultValue = function(defaultOptions, options, vm) {
-  _objKeysForeach(defaultOptions, function(key, value, index) {
+const setDefaultValue = function (defaultOptions, options, vm) {
+  _objKeysForeach(defaultOptions, function (key, value, index) {
     vm.$set(options, key, value);
   });
 };
@@ -216,6 +226,8 @@ export default {
   props: {
     uploadBefore: Function,
     uploadAfter: Function,
+    uploadSuccess: Function,
+    uploadError: Function,
     value: {
       type: Object,
       required: true,
@@ -225,7 +237,7 @@ export default {
       type: Boolean,
       default: false
     },
-    textMode: {
+    load: {
       type: Boolean,
       default: false
     }
@@ -266,40 +278,48 @@ export default {
     findArray,
     dataFormat() {
       // 页面初始化
-      let modelDefault = formInitVal(this.propOption);
-      this.modelDefault = modelDefault;
-
-      this.model = deepClone(modelDefault.tableForm);
+      this.modelDefault = formInitVal(this.propOption);
+      this.model = deepClone(this.modelDefault.tableForm);
       this.formVal();
     },
     formRulesInit() {
       _.map(this.propOption, (item, key) => {
         if (item.rules && item.disabled !== false && item.display !== false) {
           let currentRules = item.rules;
-          // 必填时自动生成message
-          if (
-            validatenull(currentRules.validator) &&
-            (!currentRules.message || currentRules.message.trim().length === 0)
-          ) {
-            if (currentRules.required) {
-              currentRules.message = `必填，请填写${item.label}`;
-              currentRules.trigger ? "" : (currentRules.trigger = `change`);
-            }
-          }
           // 添加进rules
           if (_.isArray(currentRules)) {
+            currentRules.forEach(currentRule => {
+              this.fillRequiredRule(currentRule, item);
+            });
             this.$set(this.formRules, item.prop, currentRules);
           } else if (_.isObject(currentRules)) {
+            this.fillRequiredRule(currentRules, item);
             this.$set(this.formRules, item.prop, [currentRules]);
           }
         }
       });
     },
+    // 必填时自动生成message
+    fillRequiredRule(currentRules, item) {
+      if (
+        validatenull(currentRules.validator) &&
+        (!currentRules.message || currentRules.message.trim().length === 0)
+      ) {
+        if (currentRules.required) {
+          currentRules.message = `必填，请填写${item.label}`;
+          currentRules.trigger ? "" : (currentRules.trigger = `change`);
+        }
+      }
+    },
     formVal() {
-      _.map(this.value, (value, key) => {
-        this.$set(this.model, key, value);
-      });
-      this.forEachLabel();
+      if (!this.formCreate && this.validatenull(this.value)) {
+        this.resetForm();
+      } else {
+        Object.keys(this.value).forEach(ele => {
+          this.$set(this.model, ele, this.value[ele]);
+        });
+        this.forEachLabel();
+      }
       this.$emit("input", this.model);
     },
     forEachLabel() {
@@ -367,6 +387,10 @@ export default {
         this.allDisabled
       );
     },
+    // 判断该项是否为不可编辑
+    vaildTextMode(column, group) {
+      return this.vaildBoolean(column.textMode, group.textMode, this.textMode);
+    },
     // 验证表单是否显隐
     vaildDisplay(column) {
       if (!this.validatenull(column.display)) {
@@ -390,6 +414,8 @@ export default {
      */
     resetForm(params = {}) {
       const part = params.part;
+
+      // 重置model
       if (part) {
         this.columnOption.forEach(ele => {
           ele.forms.forEach(form => {
@@ -400,8 +426,16 @@ export default {
       } else {
         this.model = this.deepClone(this.modelDefault.tableForm);
       }
+
+      // 重置modelTranslate
+      this.modelTranslate = {};
+      this.forEachLabel();
+
+      // 触发input方法，修改外部model
       this.$emit("input", this.model);
       this.$emit("reset-change");
+
+      // 清除表单验证
       this.$nextTick(() => {
         this.clearValidate();
       });
@@ -484,9 +518,15 @@ export default {
         });
       }
     },
-    displayText(column) {
-      let prop = column.prop;
-      return this.modelTranslate[`$${prop}`] || this.model[prop];
+    getGroupByProp(prop) {
+      let groups = this.options.group;
+      for (let index = 0; index < groups.length; index++) {
+        let group = groups[index];
+        if (group.prop === prop) {
+          return group;
+        }
+      }
+      return -1;
     }
   },
   computed: {
@@ -515,6 +555,10 @@ export default {
         (ele.forms || []).forEach((form, cindex) => {
           //动态计算列的位置，如果为隐藏状态则或则手机状态不计算
           if (form.hide !== true && form.display !== false && !this.isMobile) {
+            // 如果该项没有设置span，且设置了itemSpan，则赋值itemSpan
+            if (typeof form.span === 'undefined' && typeof this.options.itemSpan !== 'undefined') {
+              form.span = this.options.itemSpan;
+            }
             form = calcCount(form, this.itemSpanDefault, cindex === 0);
           }
         });
@@ -543,6 +587,16 @@ export default {
     },
     Form() {
       return this.$refs[this.formRef];
+    },
+    textMode() {
+      return this.options.textMode;
+    },
+    slotProps() {
+      return {
+        size: this.controlSize,
+        disabled: this.allDisabled,
+        textMode: this.textMode
+      };
     }
   },
   watch: {
@@ -550,8 +604,8 @@ export default {
       deep: true,
       handler(newVal, oldVal) {
         if (!this.formCreate) {
-          this.$emit("input", this.model);
-          this.$emit("change", this.model);
+          this.$emit("input", newVal);
+          this.$emit("change", newVal);
         }
       }
     },
@@ -583,6 +637,11 @@ export default {
         ) {
           this.allDisabled = this.disabled;
         }
+      }
+    },
+    textMode(newVal) {
+      if (newVal === true) {
+        this.clearValidate();
       }
     }
   }

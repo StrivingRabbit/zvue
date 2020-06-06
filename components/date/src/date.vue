@@ -41,7 +41,11 @@
       :picker-options="pickerOptions"
       :value-format="valueFormat"
       :placeholder="placeholder"
-      @change="handleChange"
+      :editable="editable"
+      :time-arrow-control="timeArrowControl"
+      :popper-class="popperClass"
+      :unlink-panels="unlinkPanels"
+      :prefix-icon="prefixIcon"
       @blur="handleBlur"
       @focus="handleFocus"
       @click.native="handleClick"
@@ -90,14 +94,28 @@ export default {
     },
     pickerOptions: {
       type: Object,
-      default: () => {}
+      default: () => ({})
     },
     type: {
       type: String,
       default: "date"
     },
     valueFormat: {},
-    format: {}
+    format: {},
+    editable: {
+      type: Boolean,
+      default: true
+    },
+    timeArrowControl: {
+      type: Boolean,
+      default: false
+    },
+    popperClass: String,
+    unlinkPanels: {
+      type: Boolean,
+      default: false
+    },
+    prefixIcon: String
   },
   computed: {
     isDategroup() {
@@ -108,6 +126,12 @@ export default {
     datetime() {
       this.text = "";
       this.setCurrent((this.datetime || []).join(","));
+    },
+    text: {
+      handler(val) {
+        this.handleChange(val);
+      },
+      deep: true,
     }
   },
   created() {
@@ -115,7 +139,7 @@ export default {
       this.init();
     }
   },
-  mounted() {},
+  mounted() { },
   methods: {
     setCurrent(val) {
       this.$emit("input", val);
