@@ -16,7 +16,7 @@
     :allow-create="allowCreate"
     :default-first-option="defaultFirstOption || allowCreate?true:false"
     :disabled="disabled"
-    @change="handleChange"
+    @change="selectChange"
     @focus="handleFocus"
     @blur="handleBlur"
     @click.native="handleClick"
@@ -32,7 +32,7 @@
         <el-option
           v-for="oitem in group[groupsKey]"
           :disabled="oitem[disabledKey]"
-          :key="oitem[valueKey] || getLabelText(oitem)"
+          :key="validatenull(oitem[valueKey]) || getLabelText(oitem)"
           :label="getLabelText(oitem)"
           :value="oitem[valueKey]"
         >
@@ -44,7 +44,7 @@
       <el-option
         v-for="oitem in visibleDic"
         :disabled="oitem[disabledKey]"
-        :key="oitem[valueKey] || getLabelText(oitem)"
+        :key="validatenull(oitem[valueKey]) || getLabelText(oitem)"
         :label="getLabelText(oitem)"
         :value="oitem[valueKey]"
       >
@@ -142,7 +142,7 @@ export default {
         method: this.dicMethod,
         query: this.dicQuery
       }).then(res => {
-        _.isArray(res) && this.validatenull(res) ? "" : (this.netDic = res);
+        Array.isArray(res) && this.validatenull(res) ? "" : (this.netDic = res);
       }).finally(() => this.loading = false)
     },
     load() {
@@ -150,9 +150,34 @@ export default {
         return;
       }
       this.end += this.pageSize;
+    },
+    selectChange(value) {
+      this.handleChange(value, this.findSelectDataByValue(value))
+    },
+    findSelectDataByValue(value) {
+      // 获取当前选中的对象
+      let res = null;
+      if (this.group) {
+        res = this.flatDic.filter(item => value.includes(item[this.valueKey]));
+      } else {
+        res = this.netDic.find(item => item[this.valueKey] === value);
+      }
+      return res;
     }
   },
   computed: {
+    flatDic() {
+      if (this.group) {
+        let resDic = [];
+        this.netDic.forEach(group => {
+          group.groups.forEach(currentItem => {
+            resDic.push(currentItem);
+          });
+        });
+        return resDic;
+      }
+      return this.netDic;
+    },
     visibleDic() {
       let tempArr = [];
       if (this.infinitescroll) {

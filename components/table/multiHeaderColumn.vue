@@ -14,7 +14,7 @@
     <template v-for="col in columnConfig">
       <multi-header-column
         v-if="col.children && col.children.length"
-        :key="col.label"
+        :key="col.prop"
         :col="col"
         :align="col.align || parentOption.align || config.align"
         :header-align="col.headerAlign || parentOption.headerAlign || config.headerAlign"
@@ -22,7 +22,7 @@
       <el-table-column
         v-else-if="!col.hide"
         show-overflow-tooltip
-        :key="col.label"
+        :key="col.prop"
         :prop="col.prop"
         :label="col.label"
         :width="col.width"
@@ -40,6 +40,7 @@
           <slot
             v-if="col.slot"
             :name="col.prop"
+            :value="getValueByPath(scopeRow.row, col.prop)"
             :label="handleDetail(scopeRow.row,col,DIC[col.prop])"
             :scopeRow="scopeRow"
             :row="scopeRow.row"
@@ -51,7 +52,7 @@
           ></slot>
           <form-temp
             v-else-if="cellEditFlag(scopeRow.row,col)"
-            v-model="scopeRow.row[col.prop]"
+            :value="getValueByPath(scopeRow.row, col.prop)"
             :isCrud="true"
             :column="col"
             :size="controlSize"
@@ -59,23 +60,39 @@
             :upload-before="col.uploadBefore"
             :upload-after="col.uploadAfter"
             :disabled="col.disabled"
+            :textMode="col.textMode"
             @click.native.stop
+            @input="modelInput($event,scopeRow.row,col)"
           ></form-temp>
           <template v-else>
             <span
               v-if="['array'].includes(col.type)"
-            >{{_detailData(scopeRow.row[col.prop],col.dataType).join(' | ')}}</span>
+            >{{_detailData(getValueByPath(scopeRow.row, col.prop),col.dataType).join(' | ')}}</span>
+            <span v-else-if="['url'].includes(col.type)">
+              <el-link
+                type="primary"
+                v-bind="!!col.click ? '' :{
+                  href: getValueByPath(scopeRow.row, col.prop),
+                  target:col.target || '_blank'
+                }"
+                @click="col.click(getValueByPath(scopeRow.row, col.prop),scopeRow.row,col)"
+              >{{getValueByPath(scopeRow.row, col.prop)}}</el-link>
+            </span>
             <span v-else-if="col.displayAs=='switch' && ['switch'].includes(col.type)">
               <z-switch
                 :size="controlSize"
-                v-model="scopeRow.row[col.prop]"
+                :value="getValueByPath(scopeRow.row, col.prop)"
                 :activeColor="col.activeColor"
                 :inactiveColor="col.inactiveColor"
                 disabled
               />
             </span>
-            <span v-else-if="['img'].includes(col.type)">
-              <z-img v-model="scopeRow.row[col.prop]" :load="col.load" :error="col.error">
+            <span :style="{display:'flex'}" v-else-if="['img'].includes(col.type)">
+              <z-img
+                :value="getValueByPath(scopeRow.row, col.prop)"
+                :load="col.load"
+                :error="col.error"
+              >
                 <!-- <template #placeholder="scope">
                   <slot :name="`${col.prop}Placeholder`" :scope="scope"></slot>
                 </template>
@@ -114,7 +131,8 @@ export default {
       '_detailData',
       '_columnFormatter',
       '_globalColumnFormatter',
-      'handleDetail'
+      'handleDetail',
+      'modelInput'
     ]
 
     methodList.forEach(method => {

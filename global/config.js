@@ -8,13 +8,14 @@ export default {
     cellStyle: { padding: '0px' },
     headerCellStyle: { padding: '0px', height: '50px' },
     selectionWidth: 37,
-    indexWidth: 50,
+    indexWidth: 54,
     align: 'left',
     headerAlign: 'left',
     customTopPosition: 'right',
     indexLabel: "序号",
     expandWidth: 60,
     expandFixed: 'left',
+    sumText: '合 计',
     // 默认log
     LOG: {
         error: {

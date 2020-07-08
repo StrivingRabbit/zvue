@@ -1,6 +1,6 @@
 import { KEY_COMPONENT_NAME } from '../global/variable'
 import { validatenull } from './validate'
-import { detailDataType } from './util';
+import { detailDataType, setValueByPath } from './util';
 
 const dateList = [
     'dates',
@@ -32,6 +32,8 @@ let typeMap = {
     switch: 'switch',
     number: 'input-number',
     password: 'input',
+    tree: 'input-tree',
+    table: 'input-table'
 }
 
 export const getComponent = function (type, component) {
@@ -108,24 +110,6 @@ export const initVal = ({ listType, type, multiple, dataType, value, curentForm 
         }
     }
 
-    // 日期处理，不是很恰当，后面可能需要去除
-    /* if (dateList.includes(type) || ['time', 'timerange'].includes(type)) {
-        if (value instanceof Array && value.length > 0) {
-            value = value.map(date => {
-                if (validatenull(date)) {
-                    return new Date();
-                }
-                if (typeof date === 'string') {
-                    return new Date(date);
-                } else {
-                    return date;
-                }
-            });
-        } else if (typeof value === "string" && value.length != 0) {
-            value = new Date(value);
-        }
-    } */
-
     // 如果是范围滑块，则需要初始化为[0,0]
     if (type === 'slider') {
         if (curentForm.range) {
@@ -135,15 +119,6 @@ export const initVal = ({ listType, type, multiple, dataType, value, curentForm 
             })
         }
     }
-
-    // 数字处理
-    /* if ((type === 'number' || curentForm.rawtype === 'number'
-        || dataType === 'number') && typeof value !== 'undefined') {
-        value = parseFloat(value);
-        if (isNaN(value)) {
-            value = undefined;
-        }
-    } */
 
     // 数据转换，解决数据不匹配问题
     if (dataType) {
@@ -177,18 +152,70 @@ export const calcCascader = (list = []) => {
     return list;
 };
 /**
+ * 搜索框获取动态组件
+ */
+export const getSearchType = (column, component = false) => {
+    const type = column.type;
+    const range = column.searchRange;
+    let result = type || 'input';
+    if (['select', 'radio', 'checkbox', 'switch'].includes(type)) {
+        result = 'select';
+    } else if (dateList.includes(type)) {
+        if (range) {
+            if (type === 'date') {
+                result = 'daterange';
+            } else if (type === 'datetime') {
+                result = 'datetimerange';
+            } else if (type === 'time') {
+                result = 'timerange';
+            } else {
+                result = type;
+            }
+        } else {
+            if (type === 'daterange') {
+                result = 'date';
+            } else if (type === 'datetimerange') {
+                result = 'datetime';
+            } else if (type === 'timerange') {
+                result = 'time';
+            } else {
+                result = type;
+            }
+        }
+    } else if (['cascader'].includes(type)) {
+        result = 'cascader';
+    } else if (['number'].includes(type)) {
+        result = 'input-number';
+    } else if (['textarea'].includes(type)) {
+        result = 'input';
+    }
+    if (component) {
+        result = KEY_COMPONENT_NAME + result;
+    }
+    return result;
+};
+/**
  * 计算空白列row
  */
 let count = 0;
 export const calcCount = (ele, spanDefault = 12, init = false) => {
+    /**
+     * count  // 当前行已分配span
+     * spanAll // 当前行总span
+     */
     if (init) count = 0;
     const spanAll = 24;
+    // 每次循环都要计算当前行已分配span
     count = count + (ele.span || spanDefault) + (ele.offset || 0);
     if (count === spanAll) {
+        // 如果 已分配span 等于 总span，则当前行分配完毕，重置count为0
         count = 0;
     } else if (count > spanAll) {
+        // 如果 已分配span 大于 总span，则说明另起一行，则需要重置 已分配span
         count = 0 + (ele.span || spanDefault) + (ele.offset || 0);
     } else if (ele.row && count !== spanAll) {
+        // 如果有row属性，并且 已分配span 不等于 总span，既当前行span没有分配完毕
+        // 则分配ele剩余count，并且重置 已分配span
         ele.count = spanAll - count;
         count = 0;
     }
@@ -201,44 +228,40 @@ export const formInitVal = (list = []) => {
     let tableForm = {};
     let searchForm = {};
     list.forEach(ele => {
-        if (ele.notModel) return;
+        let currentValue = null;
+
         if (
             ['checkbox', 'cascader', 'dynamic', 'dates'].includes(ele.type) ||
             (ele.type === 'upload' && ele.listType !== 'picture-img') ||
             ele.multiple || ele.range || ele.dataType === 'array'
         ) {
-            tableForm[ele.prop] = [];
-            if (ele.search) searchForm[ele.prop] = [];
+            currentValue = [];
         } else if (
             ['number', 'rate', 'slider'].includes(ele.type) ||
             ele.dataType === 'number'
         ) {
-            tableForm[ele.prop] = undefined;
-            if (ele.search) {
-                searchForm[ele.prop] = undefined;
-            }
+            currentValue = undefined;
         } else if (['switch'].includes(ele.type) || ele.dataType === 'boolean') {
-            tableForm[ele.prop] = false;
-            if (ele.search) {
-                searchForm[ele.prop] = false;
-            }
+            currentValue = false;
         } else {
-            tableForm[ele.prop] = '';
-            if (ele.search) {
-                searchForm[ele.prop] = '';
-            }
+            currentValue = '';
         }
         // 表单默认值设置
         if (!validatenull(ele.valueDefault)) {
             if (ele.type === 'number' || ele.dataType === 'number') {
-                tableForm[ele.prop] = parseFloat(ele.valueDefault);
+                currentValue = parseFloat(ele.valueDefault);
             } else {
-                tableForm[ele.prop] = ele.valueDefault;
+                currentValue = ele.valueDefault;
             }
         }
+
+        setValueByPath(tableForm, ele.prop, currentValue);
+        if (ele.search)
+            setValueByPath(searchForm, ele.prop, currentValue);
+
         // 搜索表单默认值设置
         if (!validatenull(ele.searchDefault)) {
-            searchForm[ele.prop] = ele.searchDefault;
+            setValueByPath(searchForm, ele.prop, ele.searchDefault);
         }
     });
     return {

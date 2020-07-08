@@ -161,7 +161,7 @@ export default {
         }
         // 如果创建和值变化小于1000毫秒，则不可手动执行lazyLoad
         // 组件新创建时会用值直接去请求，值改变也会去请求，两个请求会冲突
-        if (_.now() - this.createdTimeStamp < 1000) {
+        if (Date.now() - this.createdTimeStamp < 1000) {
           this.runLazyLoad = false;
         }
         this.execLazyLoad();
@@ -182,13 +182,13 @@ export default {
     if (this.type === "cascader-panel") {
       this.componentId = "el-cascader-panel";
     }
-    this.createdTimeStamp = _.now();
+    this.createdTimeStamp = Date.now();
   },
   mounted() {
     // tags的处理
     this.$refs["cascader"].$watch("presentTags", (newVal, oldVal) => {
       if (newVal instanceof Array) {
-        newVal = newVal.map(item => _.last(item.text.split(this.separator))).join(DIC_SPLIT);
+        newVal = newVal.map(item => item.text.split(this.separator).pop()).join(DIC_SPLIT);
       }
       this.setFromModelTranslate(newVal);
     });
@@ -201,7 +201,7 @@ export default {
       newVal = newVal.trim();
       if (newVal.length) {
         if (this.showAllLevels === false) {
-          newVal = _.last(newVal.split(DIC_SPLIT));
+          newVal = newVal.split(DIC_SPLIT).pop();
         }
         // 赋值到modelTranslate
         this.setFromModelTranslate(newVal);

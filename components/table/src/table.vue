@@ -1,5 +1,5 @@
 <template>
-  <div class="zvue-table-wrapper" :style="{height:wrapperHeight,width:setPx(parentOption.width)}">
+  <div class="zvue-table-wrapper" :style="{height:wrapperHeight,width:setPx(tableOption.width)}">
     <div
       v-if="options.customTop || $scopedSlots['custom-top']"
       ref="customTop"
@@ -16,21 +16,29 @@
     </div>
     <div v-loading="loading" class="zvue-table-body">
       <el-table
-        highlight-current-row
-        header-row-class-name="zvue-table-header"
-        cell-class-name="zvue-table-cell"
         ref="dataBaseTable"
+        highlight-current-row
+        :header-row-class-name="headerRowClassName"
+        :header-row-style="tableOption.headerRowStyle"
+        :row-class-name="tableOption.rowClassName"
+        :cell-class-name="cellClassName"
         :row-key="rowKey"
-        :expand-row-keys="parentOption.expandRowKeys || expandList"
-        :default-expand-all="parentOption.defaultExpandAll"
-        :row-style="config.rowStyle"
-        :cell-style="config.cellStyle"
-        :header-cell-style="config.headerCellStyle"
+        :lazy="tableOption.lazy"
+        :tree-props="tableOption.treeProps || {children: 'children', hasChildren: 'hasChildren'}"
+        :load="_treeLoad"
+        :expand-row-keys="tableOption.expandRowKeys || expandList"
+        :default-expand-all="tableOption.defaultExpandAll"
+        :row-style="tableOption.rowStyle || config.rowStyle"
+        :cell-style="tableOption.cellStyle || config.cellStyle"
+        :header-cell-style="tableOption.headerCellStyle || config.headerCellStyle"
         :key="key"
         :data="tableShowData"
         :height="tableHeight"
         :size="controlSize"
-        :show-header="options.showHeader"
+        :show-header="tableOption.showHeader"
+        :show-summary="tableOption.showSummary"
+        :summary-method="_tableSummaryMethod"
+        :span-method="_tableSpanMethod"
         @current-change="_currentChange"
         @expand-change="_expandChagne"
         @row-click="rowClick"
@@ -44,9 +52,9 @@
         <el-table-column
           type="expand"
           align="center"
-          v-if="parentOption.expand"
-          :width="parentOption.expandWidth || config.expandWidth"
-          :fixed="vaildData(parentOption.expandFixed,config.expandFixed)"
+          v-if="tableOption.expand"
+          :width="tableOption.expandWidth || config.expandWidth"
+          :fixed="vaildData(tableOption.expandFixed,config.expandFixed)"
         >
           <template #default="{row,index}">
             <slot :row="row" :index="index" name="expand"></slot>
@@ -59,7 +67,7 @@
           fixed="left"
           type="selection"
           :width="config.selectionWidth"
-          :selectable="_selectable"
+          :selectable="tableMethods.selectable"
           align="center"
         ></el-table-column>
 
@@ -110,18 +118,18 @@
               type="text"
               :size="controlSize"
               @click.stop="rowCell(scopeRow.row,scopeRow.$index)"
-              v-if="vaildBoolean(parentOption.editBtn,config.editBtn)"
+              v-if="vaildBoolean(tableOption.editBtn,config.editBtn)"
             >{{_editBtnText(scopeRow.row,scopeRow.index)}}</el-button>
             <!-- 取消按钮 -->
             <el-button
-              v-if="scopeRow.row.$cellEdit && vaildBoolean(parentOption.calcelBtn,config.calcelBtn)"
+              v-if="scopeRow.row.$cellEdit && vaildBoolean(tableOption.calcelBtn,config.calcelBtn)"
               type="text"
               :size="controlSize"
               @click.stop="rowCanel(scopeRow.row,scopeRow.$index)"
             >取 消</el-button>
             <!-- 操作列的slot -->
             <slot
-              v-if="vaildData(parentOption.operation,!!$scopedSlots.operation)"
+              v-if="vaildData(tableOption.operation,!!$scopedSlots.operation)"
               :name="config.operationSlotName"
               :scopeRow="scopeRow"
               :row="scopeRow.row"
@@ -201,7 +209,7 @@ import {
   setPx
 } from "../../../utils/util";
 import { detail } from "../../../utils/detail";
-import { DIC_SPLIT } from "../../../global/variable";
+import { DIC_SPLIT, EMPTY_VALUE } from "../../../global/variable";
 
 //单双击冲突timer
 let dblclickTimer = null;
@@ -222,7 +230,9 @@ export default {
     load: {
       type: Boolean,
       default: false
-    }
+    },
+    summaryMethod: Function,
+    spanMethod: Function,
   },
   provide() {
     return {
@@ -253,7 +263,8 @@ export default {
       formIndexList: [],
       currentRowData: [], // 当前选中行
       lastCurrentRowData: [], // 上一选中行
-      expandList: []  // 展开的列
+      expandList: [],  // 展开的列
+      sumsList: []
     };
   },
   created() {
@@ -314,6 +325,8 @@ export default {
             this.loading = false;
           }, 2000);
         }
+
+        if (!this.options.data) this.options.data = [];
 
         this._setTableData(this.options.data);
         this.setTotal(this.options.data.length);
@@ -424,8 +437,8 @@ export default {
     },
     // 计算高度
     _computedLayoutHeight() {
-      // 如果是根据内容自适应
-      if (this.uiConfig.height === "auto") return;
+      // 如果是 auto 或者 没有配置pagination 则根据内容自适应
+      if (this.uiConfig.height === "auto" || this.uiConfig.pagination === false) return;
 
       // 拿到设置高度
       let _height = this.uiConfig.height
@@ -480,14 +493,6 @@ export default {
     _handleCurrentChange(currentPage) {
       this.currentPage = currentPage;
     },
-    // 当前行是否可多选
-    _selectable(row, index) {
-      if (typeof this.tableMethods.selectable == "function") {
-        return this.tableMethods.selectable(row, index);
-      } else {
-        return true;
-      }
-    },
     // 当前行发生变化
     _currentChange(currentRow, oldCurrentRow) {
       this.currentRowData = currentRow;
@@ -504,9 +509,73 @@ export default {
         if (expandedRows.length) {
           (this.parentOption?.expandRowKeys || this.expandList).push(row[this.rowKey]);
         }
-      } else {
+      } else if (this._typeOf(expandedRows) === 'Array') {
         this.expandList = [...expandedRows];
       }
+    },
+    //合集统计逻辑
+    _tableSummaryMethod(param) {
+      //如果自己写逻辑则调用summaryMethod方法
+      if (typeof this.summaryMethod === "function")
+        return this.summaryMethod(param);
+      const { columns, data } = param;
+      const sums = [];
+      if (columns.length > 0) {
+        columns.forEach((column, index) => {
+          let currItem = this.sumColumnList.find(
+            item => item.name === column.property
+          );
+          if (index === 0) {
+            sums[index] = this.tableOption.sumText || config.sumText;
+          } else if (currItem) {
+            switch (currItem.type) {
+              case "count":
+                sums[index] = "计数：" + data.length;
+                break;
+              case "avg":
+                let avgValues = data.map(item => Number(item[column.property]));
+                let nowindex = 1;
+                sums[index] = avgValues.reduce((perv, curr) => {
+                  let value = Number(curr);
+                  if (!isNaN(value)) {
+                    return (perv * (nowindex - 1) + curr) / nowindex++;
+                  } else {
+                    return perv;
+                  }
+                }, 0);
+                sums[index] = "平均：" + sums[index].toFixed(2);
+                break;
+              case "sum":
+                let values = data.map(item => Number(item[column.property]));
+                sums[index] = values.reduce((perv, curr) => {
+                  let value = Number(curr);
+                  if (!isNaN(value)) {
+                    return perv + curr;
+                  } else {
+                    return perv;
+                  }
+                }, 0);
+                sums[index] = "合计：" + sums[index].toFixed(2);
+                break;
+            }
+          } else {
+            sums[index] = EMPTY_VALUE;
+          }
+        });
+      }
+      this.sumsList = sums;
+      return sums;
+    },
+    //合并行
+    _tableSpanMethod(param) {
+      if (typeof this.spanMethod === "function") return this.spanMethod(param);
+    },
+    //树懒加载
+    _treeLoad(tree, treeNode, resolve) {
+      this.$emit('tree-load', tree, treeNode, (data) => {
+        tree.children = data;
+        resolve(data);
+      })
     },
 
     /**
@@ -521,28 +590,31 @@ export default {
         if (ele.rules && ele.cell) this.formCellRules[ele.prop] = ele.rules;
       });
 
-      _.map(this.propOption, (item, key) => {
-        if (item.rules && item.disabled !== false && item.display !== false) {
-          let currentRules = item.rules;
-          // 必填时自动生成message
-          if (
-            validatenull(currentRules.validator) &&
-            (!currentRules.message || currentRules.message.trim().length === 0)
-          ) {
-            if (currentRules.required) {
-              currentRules.message = `必填，请填写${item.label}`;
+      for (const key in this.propOption) {
+        if (this.propOption.hasOwnProperty(key)) {
+          const item = this.propOption[key];
+          if (item.rules && item.disabled !== false && item.display !== false) {
+            let currentRules = item.rules;
+            // 必填时自动生成message
+            if (
+              validatenull(currentRules.validator) &&
+              (!currentRules.message || currentRules.message.trim().length === 0)
+            ) {
+              if (currentRules.required) {
+                currentRules.message = `必填，请填写${item.label}`;
+              }
+            }
+            // 添加进rules
+            if (Array.isArray(currentRules)) {
+              this.$set(this.formRules, item.prop, currentRules);
+              this.$set(this.formCellRules, item.prop, currentRules);
+            } else if (this._typeOf(currentRules) === 'Object') {
+              this.$set(this.formRules, item.prop, [currentRules]);
+              this.$set(this.formCellRules, item.prop, [currentRules]);
             }
           }
-          // 添加进rules
-          if (_.isArray(currentRules)) {
-            this.$set(this.formRules, item.prop, currentRules);
-            this.$set(this.formCellRules, item.prop, currentRules);
-          } else if (_.isObject(currentRules)) {
-            this.$set(this.formRules, item.prop, [currentRules]);
-            this.$set(this.formCellRules, item.prop, [currentRules]);
-          }
         }
-      });
+      }
     },
     rowCell(row, index) {
       if (row.$cellEdit) {
@@ -667,7 +739,10 @@ export default {
         return;
       }
 
-      this.Table.setCurrentRow(this.tableShowData[index]);
+      let row = this.tableShowData[index];
+      let column = this.columnConfig[index];
+      this.Table.setCurrentRow(row);
+      this.$emit("row-click", row, column);
     },
     //多选选择当前项
     toggleSelection(rowsIndex, selectedArr) {
@@ -819,27 +894,8 @@ export default {
      * 外部调用方法
      */
     //get
-    // 获取表格多选框选中数据
     getSelectedData() {
-      //多选获取当前选中值
       return this.selectedData;
-    },
-    // 获取当前表格单击选中数据
-    getCurrentRowData() {
-      //单选获取当前选中行
-      return this.currentRowData;
-    },
-    // 获取表格全部数据
-    getTableData() {
-      if (this.isServerMode) {
-        return this.getTableShowData();
-      } else {
-        return this.tableData;
-      }
-    },
-    // 获取表格当前显示数据
-    getTableShowData() {
-      return this.tableShowData;
     },
     //set
     // 设置表格数据
@@ -868,6 +924,8 @@ export default {
     refreshTable() {
       this._tableInit(true);
       this.doLayout();
+      // 清空多选数据
+      this.selectedData = [];
     },
     //搜索指定的属性配置
     findColumnIndex(prop) {
@@ -989,6 +1047,29 @@ export default {
     },
     isGroup() {
       return !this.validatenull(this.tableOption.group);
+    },
+    sumColumnList() {
+      return this.tableOption.sumColumnList || [];
+    },
+    cellClassName() {
+      const defaultClass = 'zvue-table-cell';
+      if (typeof this.tableOption.cellClassName === 'function') {
+        return this.tableOption.cellClassName;
+      }
+      if (typeof this.tableOption.cellClassName === 'string') {
+        return `${this.tableOption.cellClassName} ${defaultClass}`;
+      }
+      return defaultClass;
+    },
+    headerRowClassName() {
+      const defaultClass = 'zvue-table-header';
+      if (typeof this.tableOption.headerRowClassName === 'function') {
+        return this.tableOption.headerRowClassName;
+      }
+      if (typeof this.tableOption.headerRowClassName === 'string') {
+        return `${this.tableOption.headerRowClassName} ${defaultClass}`;
+      }
+      return defaultClass;
     }
   },
   watch: {
@@ -1005,7 +1086,9 @@ export default {
           this.methodsQueue.forEach(element => {
             element.fn.apply(this, element.params);
           });
-          // this.methodsQueue = []; // 如果在这里清除，调用刷新方法后无法再次执行
+          // 如果在这里清除，调用刷新方法后无法再次执行
+          // 2020-6-10 如果不清除，会导致重复调用方法
+          this.methodsQueue = [];
         });
       }
     },
@@ -1073,6 +1156,7 @@ export default {
   font-family: @TableFontFamily;
   font-size: @TableFontSize;
   width: 100%;
+
   .el-table {
     border: 1px solid @borderColor;
     border-bottom: 0px;
@@ -1142,6 +1226,13 @@ export default {
   .el-date-editor.el-input__inner,
   .el-select {
     width: 100% !important;
+  }
+  // 合计footer
+  .el-table__fixed-footer-wrapper,
+  .el-table__footer-wrapper {
+    td {
+      padding: 0 !important;
+    }
   }
 }
 </style>

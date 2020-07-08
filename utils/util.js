@@ -19,13 +19,13 @@ export const miAjax = ({ axios = this.$axios || AXIOS, url, method = 'get', quer
                 axios.get(url, {
                     params: query
                 }).then(res => {
-                    resolve(_.get(res.data, resKey) || res.data)
+                    resolve(getValueByPath(res.data, resKey) || res.data)
                 }).catch(err => {
                     resolve([]);
                 })
             } else if (method.toLowerCase() === 'post') {
                 axios.post(url, query).then(res => {
-                    resolve(_.get(res.data, resKey) || res.data)
+                    resolve(getValueByPath(res.data, resKey) || res.data)
                 }).catch(err => {
                     resolve([]);
                 })
@@ -187,11 +187,11 @@ export const setPx = (val, defval = '') => {
  * @param {form的model} model
  * @param {是否去除空值和带$的值} translate 
  */
-export const filterDefaultParams = (model, modelTranslate, translate = false) => {
+export const filterDefaultParams = (model, modelTranslate, translate = false, noModelFileds = []) => {
     let data = deepClone(model);
     if (translate) return deepClone({ ...data, ...modelTranslate });
     for (let o in data) {
-        if (o.indexOf('$') !== -1 || validatenull(data[o])) {
+        if (o.indexOf('$') !== -1 || validatenull(data[o]) || noModelFileds.includes(o)) {
             delete data[o];
         }
     }
@@ -219,7 +219,7 @@ export const _objKeysForeach = (obj, cb) => {
 export const setDefaultValue = (defaultOptions, options, vm) => {
     _objKeysForeach(defaultOptions, function (key, value, index) {
         if (!options.hasOwnProperty(key)) {
-            vm.$set(options, key, _.cloneDeep(value));
+            vm.$set(options, key, deepClone(value));
         } else {
             if (typeof value === "object" && typeof options[key] === "object") {
                 setDefaultValue(value, options[key], vm);
@@ -227,3 +227,118 @@ export const setDefaultValue = (defaultOptions, options, vm) => {
         }
     })
 };
+// 获取对象类型
+export const _typeOf = (obj) => {
+    return Object.prototype.toString.call(obj).split(' ')[1].slice(0, -1);
+}
+
+// 根据prop取值
+export const getValueByPath = function (object, prop) {
+    prop = prop || '';
+    const paths = prop.split('.');
+    let current = object;
+    let result = null;
+    for (let i = 0, j = paths.length; i < j; i++) {
+        const path = paths[i];
+        if (!current) break;
+
+        if (i === j - 1) {
+            result = current[path];
+            break;
+        }
+        current = current[path];
+    }
+    return result;
+};
+
+// 根据path取值
+export function getPropByPath(obj = {}, path = '', strict) {
+    let tempObj = obj;
+    path = path.replace(/\[(\w+)\]/g, '.$1');
+    path = path.replace(/^\./, '');
+
+    let keyArr = path.split('.');
+    let i = 0;
+    for (let len = keyArr.length; i < len - 1; ++i) {
+        if (!tempObj && !strict) break;
+        let key = keyArr[i];
+        if (key in tempObj) {
+            tempObj = tempObj[key];
+        } else {
+            if (strict) {
+                throw new Error('please transfer a valid prop path to form item!');
+            }
+            break;
+        }
+    }
+    return {
+        o: tempObj,
+        k: keyArr[i],
+        v: tempObj ? tempObj[keyArr[i]] : null
+    };
+};
+
+// 通过path赋值obj
+export const setValueByPath = (obj = {}, path = '', value) => {
+    let tempObj = obj;
+    path = path.replace(/\[(\w+)\]/g, '.$1');
+    path = path.replace(/^\./, '');
+
+    let keyArr = path.split('.');
+    let i = 0;
+    for (let len = keyArr.length; i < len; ++i) {
+        let key = keyArr[i];
+        if (!(key in tempObj)) {
+            if (i !== len - 1) {
+                tempObj[key] = {};
+                tempObj = tempObj[key];
+            } else {
+                tempObj[key] = value;
+            }
+        } else {
+            if (i !== len - 1) {
+                tempObj = tempObj[key];
+            } else {
+                tempObj[key] = value;
+            }
+        }
+    }
+
+    return obj;
+}
+
+// 节流
+export const throttle = (fn, interval, isFirstAutoRun) => {
+    /**
+     * 
+     * @param {要执行的函数} fn 
+     * @param {在操作多长时间后可再执行，第一次立即执行} interval 
+     */
+    var _self = fn;
+    var timer = null;
+    var first = true;
+
+    if (isFirstAutoRun) {
+        _self();
+    }
+
+    return function () {
+        var args = arguments;
+        var _me = this;
+
+        if (first) {
+            first = false;
+            _self.apply(_me, args);
+        }
+
+        if (timer) {
+            return false;
+        }
+
+        timer = setTimeout(function () {
+            clearTimeout(timer);
+            timer = null;
+            _self.apply(_me, args);
+        }, interval || 200);
+    }
+}

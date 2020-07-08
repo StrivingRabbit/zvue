@@ -1,11 +1,11 @@
 import { validatenull } from './validate';
-import { getPasswordChar, findByValue } from './util';
+import { getPasswordChar, findByValue, getValueByPath } from './util';
 import { dateTypeList } from './dataformat';
 // import dayjs from 'dayjs';
 import moment from 'moment';
 
 export const detail = (row = {}, column = {}, option = {}, dic = []) => {
-  let result = row[column.prop || column.value];
+  let result = getValueByPath(row, column.prop || column.value);
   let type = column.type;
   if (validatenull(type)) return result;
   if (validatenull(result)) {

@@ -133,7 +133,7 @@ export default {
       return this.options.size || "small";
     },
     props() {
-      let props = this.options.props;
+      let props = this.options.props || {};
       setDefaultValue(DIC_PROPS, props, this);
       return props;
     },

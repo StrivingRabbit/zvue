@@ -8,6 +8,8 @@ import Checkbox from './components/checkbox';
 import Date from './components/date';
 import Group from './components/group';
 import Input from './components/input';
+import InputTree from './components/input-tree';
+import InputTable from './components/input-table';
 import InputNumber from './components/input-number';
 import Radio from './components/radio';
 import Select from './components/select';
@@ -28,6 +30,11 @@ import vcharts from './components/vcharts'
 
 // directive
 import Clickout from "./directive/clickout"
+import Appendtobody from "./directive/appendtobody"
+
+// functions
+import { deepClone, vaildData, findArray, setPx, _typeOf, getValueByPath, getPropByPath } from './utils/util';
+const prototypes = { deepClone, vaildData, findArray, setPx, _typeOf, getValueByPath, getPropByPath }
 
 const components = [
     Dropdown,
@@ -38,6 +45,8 @@ const components = [
     Checkbox,
     Date,
     Input,
+    InputTree,
+    InputTable,
     InputNumber,
     Radio,
     Select,
@@ -58,12 +67,17 @@ const components = [
 
 const install = (Vue) => {
     Clickout(Vue);
+    Appendtobody(Vue);
     components.forEach(component => {
         if (component.install) {
             component.install(Vue);
         } else {
             Vue.component(component.name, component);
         }
+    });
+
+    Object.keys(prototypes).forEach((key) => {
+        Vue.prototype[key] = prototypes[key];
     });
 }
 
@@ -74,26 +88,5 @@ if (typeof window !== 'undefined' && window.Vue) {
 export default {
     author: 'lxh',
     version: '1.5',
-    install,
-    Table,
-    Cascader,
-    Checkbox,
-    Date,
-    Input,
-    InputNumber,
-    Radio,
-    Select,
-    Slider,
-    Switch,
-    Time,
-    Tree,
-    Upload,
-    Group,
-    Form,
-    VeLine,
-    VeBar,
-    VeHistogram,
-    VePie,
-    VeRing,
-    vcharts
+    install
 }
