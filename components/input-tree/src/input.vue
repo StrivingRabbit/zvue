@@ -1,60 +1,62 @@
 <template>
-  <el-select
-    :size="size"
-    ref="main"
-    :value="labelShow"
-    :clearable="disabled?false:clearable"
-    :placeholder="placeholder"
-    :disabled="disabled"
-    :readonly="true"
-    @click.native="initScroll"
-    @change="handleChange"
-    @focus="handleFocus"
-    @blur="handleBlur"
-  >
-    <div v-if="filter" style="padding:0 10px;margin:5px 0 0 0;">
-      <el-input size="mini" placeholder="输入关键字进行过滤" v-model="filterText"></el-input>
-    </div>
-    <el-option :style="{height:'auto',padding:0}" :value="text">
-      <div class="zvue-input-tree">
-        <el-tree
-          ref="tree"
-          class="tree-option"
-          style="padding:10px 0;"
-          :highlight-current="!multiple"
-          :data="dicList"
-          :node-key="valueKey"
-          :accordion="accordion"
-          :show-checkbox="multiple"
-          :props="treeProps"
-          :lazy="lazy"
-          :load="treeLoad"
-          :check-strictly="checkStrictly"
-          :current-node-key="multiple?'':text"
-          :filter-node-method="filterNode"
-          :default-expanded-keys="defaultExpandedKeys?defaultExpandedKeys:(defaultExpandAll?[]:keysList)"
-          :default-checked-keys="defaultCheckedKeys?defaultCheckedKeys:keysList"
-          :default-expand-all="defaultExpandAll"
-          @check="checkChange"
-          @node-click.self="handleNodeClick"
-          :icon-class="iconClass"
-        >
-          <template #default="{ data }">
-            <div style="width:100%;padding-right:10px;">
-              <slot
-                :name="prop+'Type'"
-                :labelkey="labelKey"
-                :valuekey="valueKey"
-                :item="data"
-                v-if="typeslot"
-              ></slot>
-              <span v-else>{{getLabelText(data)}}</span>
-            </div>
-          </template>
-        </el-tree>
+  <el-tooltip :disabled="tooltipDisabled" :content="labelShow" :placement="placement">
+    <el-select
+      :size="size"
+      ref="main"
+      :value="labelShow"
+      :clearable="disabled?false:clearable"
+      :placeholder="placeholder"
+      :disabled="disabled"
+      :readonly="true"
+      @click.native="initScroll"
+      @change="handleChange"
+      @focus="handleFocus"
+      @blur="handleBlur"
+    >
+      <div v-if="filter" style="padding:0 10px;margin:5px 0 0 0;">
+        <el-input size="mini" placeholder="输入关键字进行过滤" v-model="filterText"></el-input>
       </div>
-    </el-option>
-  </el-select>
+      <el-option :style="{height:'auto',padding:0}" :value="text">
+        <div class="zvue-input-tree">
+          <el-tree
+            ref="tree"
+            class="tree-option"
+            style="padding:10px 0;"
+            :highlight-current="!multiple"
+            :data="dicList"
+            :node-key="valueKey"
+            :accordion="accordion"
+            :show-checkbox="multiple"
+            :props="treeProps"
+            :lazy="lazy"
+            :load="treeLoad"
+            :check-strictly="checkStrictly"
+            :current-node-key="multiple?'':text"
+            :filter-node-method="filterNode"
+            :default-expanded-keys="defaultExpandedKeys?defaultExpandedKeys:(defaultExpandAll?[]:keysList)"
+            :default-checked-keys="defaultCheckedKeys?defaultCheckedKeys:keysList"
+            :default-expand-all="defaultExpandAll"
+            @check="checkChange"
+            @node-click="handleNodeClick"
+            :icon-class="iconClass"
+          >
+            <template #default="{ data }">
+              <div style="width:100%;padding-right:10px;">
+                <slot
+                  :name="prop+'Type'"
+                  :labelkey="labelKey"
+                  :valuekey="valueKey"
+                  :item="data"
+                  v-if="typeslot"
+                ></slot>
+                <span v-else>{{getLabelText(data)}}</span>
+              </div>
+            </template>
+          </el-tree>
+        </div>
+      </el-option>
+    </el-select>
+  </el-tooltip>
 </template>
 
 <script>
@@ -71,7 +73,8 @@ export default {
       node: [],
       filterText: "",
       box: false,
-      labelText: []
+      labelText: [],
+      tooltipContent: ''
     };
   },
   props: {
@@ -120,6 +123,13 @@ export default {
       type: Boolean,
       default: false
     },
+    showAllLevels: {
+      type: Boolean,
+      default: true
+    },
+    placement: {
+      type: String
+    }
   },
   watch: {
     text: {
@@ -127,9 +137,8 @@ export default {
         // 空值会触发select的change
         if (this.validatenull(value)) {
           this.clearHandle();
-        } else {
-          this.handleChange(value);
         }
+        this.handleChange(value);
       },
     },
     dic() {
@@ -181,6 +190,9 @@ export default {
       }
       return (this.labelText || []).join(DIC_SPLIT).toString()
     },
+    tooltipDisabled() {
+      return !(this.labelShow.length > 0);
+    }
   },
   mounted() {
     this.init();
@@ -233,6 +245,10 @@ export default {
           let node = this.$refs.tree.getNode(this.text)
           if (node) {
             this.labelText.push(node.data[this.labelKey])
+            if (this.showAllLevels) {
+              // 拿取从父级到当前点击路径
+              this.labelText = this.getAllLabelByNode(node)
+            }
             this.node.push(node.data);
           }
         }
@@ -264,12 +280,21 @@ export default {
         (this.validatenull(data[this.childrenKey]) && !this.multiple) ||
         this.parent
       ) {
+        // 触发input后，value会改变，labelText在init中进行设置
+        // 拿取从父级到当前点击路径
+        // let parentLabelText = this.getAllLabelByNode(node);
+
         const value = data[this.valueKey];
         const label = data[this.labelKey];
         const result = this.isString && this.multiple ? value.join(",") : value;
+
         this.text = value;
         this.node = [data];
-        this.labelText = [label];
+        /* this.labelText = [label];
+
+        if (this.showAllLevels) {
+          this.labelText = parentLabelText;
+        } */
         this.$refs.main.blur();
         this.$emit("input", result);
         this.$emit("change", result);
@@ -280,6 +305,18 @@ export default {
         this.isString && this.multiple ? this.text.join(",") : this.text;
       if (typeof this.click === "function")
         this.click({ value: result, column: this.column });
+    },
+    getAllLabelByNode(node) {
+      // 拿取从父级到当前点击路径
+      let parentLabelText = [node.data[this.labelKey]];
+      let $parent = node.parent;
+      while ($parent) {
+        this._typeOf($parent.data) === 'Object'
+          ? parentLabelText.push($parent.data[this.labelKey])
+          : '';
+        $parent = $parent.parent;
+      }
+      return parentLabelText.reverse();
     },
     handleChange(value) {
       let text = this.text;

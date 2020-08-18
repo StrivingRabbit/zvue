@@ -11,6 +11,7 @@
     :render-header="col.renderHeader"
   >
     <!-- 使用column组件会排序错乱，如果加 width 1px的column，则边框会变粗 -->
+    <!-- 正常列 -->
     <template v-for="col in columnConfig">
       <multi-header-column
         v-if="col.children && col.children.length"
@@ -21,7 +22,7 @@
       ></multi-header-column>
       <el-table-column
         v-else-if="!col.hide"
-        show-overflow-tooltip
+        :show-overflow-tooltip="vaildBoolean(col.showOverflowTooltip,true)"
         :key="col.prop"
         :prop="col.prop"
         :label="col.label"
@@ -32,6 +33,10 @@
         :align="col.align || parentOption.align || config.align"
         :header-align="col.headerAlign || parentOption.headerAlign || config.headerAlign"
         :render-header="col.renderHeader"
+        filter-placement="bottom-end"
+        :filters="_handleFilters(col)"
+        :filter-method="col.filter? _handleFiltersMethod : undefined"
+        :filter-multiple="vaildBoolean(col.filterMultiple,true)"
       >
         <template v-if="col.headerSlot" slot="header">
           <slot :name="`${col.prop}Header`" :column="col"></slot>
@@ -47,6 +52,8 @@
             :size="controlSize"
             :column="col"
             :disabled="col.disabled"
+            :readonly="col.readonly"
+            :clearable="vaildBoolean(col.clearable,true)"
             :isEdit="cellEditFlag(scopeRow.row,col)"
             :dic="DIC[col.prop]"
           ></slot>
@@ -60,14 +67,14 @@
             :upload-before="col.uploadBefore"
             :upload-after="col.uploadAfter"
             :disabled="col.disabled"
+            :readonly="col.readonly"
+            :clearable="vaildBoolean(col.clearable,true)"
             :textMode="col.textMode"
             @click.native.stop
             @input="modelInput($event,scopeRow.row,col)"
           ></form-temp>
           <template v-else>
-            <span
-              v-if="['array'].includes(col.type)"
-            >{{_detailData(getValueByPath(scopeRow.row, col.prop),col.dataType).join(' | ')}}</span>
+            <span v-if="['array'].includes(col.type)">{{_detailData(scopeRow,col)}}</span>
             <span v-else-if="['url'].includes(col.type)">
               <el-link
                 type="primary"
@@ -127,12 +134,15 @@ export default {
       'config',
       'parentOption',
       'validatenull',
+      'vaildBoolean',
       'cellEditFlag',
       '_detailData',
       '_columnFormatter',
       '_globalColumnFormatter',
       'handleDetail',
-      'modelInput'
+      'modelInput',
+      '_handleFiltersMethod',
+      '_handleFilters'
     ]
 
     methodList.forEach(method => {

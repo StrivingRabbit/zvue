@@ -2,11 +2,46 @@ import { validatenull } from "./validate"
 import { DIC_PROPS, DIC_SPLIT, DIC_HTTP_PROPS, DIC_GROUP_SPLIT } from '../global/variable'
 import AXIOS from 'axios'
 
-export const deepClone = (value) => {
-    return _.cloneDeep(value)
+/**
+* 对象深拷贝
+*/
+export const deepClone = (data) => {
+    // return _.cloneDeep(data)
+    var type = _typeOf(data);
+    var obj;
+    if (type === 'Array') {
+        obj = [];
+    } else if (type === 'Object') {
+        obj = {};
+    } else {
+        // 不再具有下一层次
+        return data;
+    }
+    if (type === 'Array') {
+        for (var i = 0, len = data.length; i < len; i++) {
+            data[i] = (() => {
+                if (data[i] === 0) {
+                    return data[i];
+                }
+                return data[i];
+            })();
+            delete data[i].$parent;
+            obj.push(deepClone(data[i]));
+        }
+    } else if (type === 'Object') {
+        for (var key in data) {
+            delete data.$parent;
+            obj[key] = deepClone(data[key]);
+        }
+    }
+    return obj;
 }
-export const miAjax = ({ axios = this.$axios || AXIOS, url, method = 'get', query, resKey = DIC_HTTP_PROPS.res }) => {
+export const miAjax = ({ axios = window.$axios || AXIOS, url, method = 'get', query, resKey = DIC_HTTP_PROPS.res }) => {
     return new Promise((resolve, reject) => {
+        if (!axios) {
+            resolve([]);
+            return;
+        }
         if (typeof url === 'function') {
             url(query).then(res => {
                 // _.get(res.data, resKey)
@@ -217,15 +252,19 @@ export const _objKeysForeach = (obj, cb) => {
 };
 // 设置默认值
 export const setDefaultValue = (defaultOptions, options, vm) => {
+    let resOptions = deepClone(options);
+
     _objKeysForeach(defaultOptions, function (key, value, index) {
-        if (!options.hasOwnProperty(key)) {
-            vm.$set(options, key, deepClone(value));
+        if (!resOptions.hasOwnProperty(key)) {
+            vm.$set(resOptions, key, deepClone(value));
         } else {
-            if (typeof value === "object" && typeof options[key] === "object") {
-                setDefaultValue(value, options[key], vm);
+            if (typeof value === "object" && typeof resOptions[key] === "object") {
+                resOptions[key] = setDefaultValue(value, resOptions[key], vm);
             }
         }
     })
+
+    return resOptions;
 };
 // 获取对象类型
 export const _typeOf = (obj) => {

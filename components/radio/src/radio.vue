@@ -1,12 +1,6 @@
 <template>
   <div>
-    <el-radio-group
-      v-model="text"
-      :size="size"
-      @change="handleChange"
-      @click.native="handleClick"
-      :disabled="disabled"
-    >
+    <el-radio-group v-model="text" :size="size" @click.native="handleClick" :disabled="disabled">
       <component
         :is="componentName"
         v-for="(item,index) in dicData"
@@ -32,12 +26,10 @@ export default {
       name: "radio"
     };
   },
-  props: {
-    value: {}
-  },
-  watch: {},
-  created() {},
-  mounted() {},
-  methods: {}
+  watch: {
+    text(val) {
+      this.handleChange(val);
+    }
+  }
 };
 </script>

@@ -1,5 +1,30 @@
 <template>
   <div class="zvue-table-wrapper" :style="{height:wrapperHeight,width:setPx(tableOption.width)}">
+    <header-search :search="search" ref="headerSearch">
+      <template slot="search" slot-scope="{size,row}">
+        <slot name="search" :row="row" :size="size"></slot>
+      </template>
+      <template slot="searchMenu" slot-scope="{size,row}">
+        <slot name="searchMenu" :row="row" :size="size"></slot>
+      </template>
+      <template
+        slot-scope="{value,column,dic,size,label,disabled}"
+        v-for="item in columnFormOption"
+        :slot="item.prop"
+      >
+        <slot
+          :value="value"
+          :column="column"
+          :dic="dic"
+          :size="size"
+          :label="label"
+          :disabled="disabled"
+          :row="search"
+          :name="item.prop+'Search'"
+          v-if="item.searchslot"
+        ></slot>
+      </template>
+    </header-search>
     <div
       v-if="options.customTop || $scopedSlots['custom-top']"
       ref="customTop"
@@ -12,12 +37,16 @@
         :allData="allData"
         :tableShowData="tableShowData"
         :selectedData="selectedData"
+        :currentRowData="currentRowData"
+        :lastCurrentRowData="lastCurrentRowData"
+        :allSelectedData="allSelectedData"
       ></slot>
     </div>
     <div v-loading="loading" class="zvue-table-body">
       <el-table
         ref="dataBaseTable"
         highlight-current-row
+        :border="tableOption.border || config.border"
         :header-row-class-name="headerRowClassName"
         :header-row-style="tableOption.headerRowStyle"
         :row-class-name="tableOption.rowClassName"
@@ -26,7 +55,7 @@
         :lazy="tableOption.lazy"
         :tree-props="tableOption.treeProps || {children: 'children', hasChildren: 'hasChildren'}"
         :load="_treeLoad"
-        :expand-row-keys="tableOption.expandRowKeys || expandList"
+        :expand-row-keys="expandList"
         :default-expand-all="tableOption.defaultExpandAll"
         :row-style="tableOption.rowStyle || config.rowStyle"
         :cell-style="tableOption.cellStyle || config.cellStyle"
@@ -47,6 +76,8 @@
         @select-all="selectAll"
         @selection-change="selectionChange"
         @select="select"
+        @cell-mouse-enter="_cellMouseEnter"
+        @cell-mouse-leave="_cellMouseLeave"
       >
         <!-- 折叠面板  -->
         <el-table-column
@@ -67,7 +98,7 @@
           fixed="left"
           type="selection"
           :width="config.selectionWidth"
-          :selectable="tableMethods.selectable"
+          :selectable="_selectable"
           align="center"
         ></el-table-column>
 
@@ -100,6 +131,7 @@
         <!-- 列操作 -->
         <el-table-column
           v-if="btnConfig"
+          class-name="zvue-table_operation"
           :fixed="btnConfig.fixed || 'right'"
           :prop="btnConfig.prop"
           :label="btnConfig.label"
@@ -112,30 +144,33 @@
             <el-input v-model="searchVal" :size="controlSize" placeholder="检索" />
           </template>
           <!-- 按钮 -->
-          <template #default="scopeRow">
+          <template #default="{row,$index,column}">
             <!-- 编辑按钮 -->
             <el-button
               type="text"
               :size="controlSize"
-              @click.stop="rowCell(scopeRow.row,scopeRow.$index)"
+              :disabled="row.$btnDisabled"
+              @click.stop="rowCell(row,$index)"
               v-if="vaildBoolean(tableOption.editBtn,config.editBtn)"
-            >{{_editBtnText(scopeRow.row,scopeRow.index)}}</el-button>
+            >{{_editBtnText(row)}}</el-button>
             <!-- 取消按钮 -->
             <el-button
-              v-if="scopeRow.row.$cellEdit && vaildBoolean(tableOption.calcelBtn,config.calcelBtn)"
+              v-if="row.$cellEdit && vaildBoolean(tableOption.calcelBtn,config.calcelBtn)"
               type="text"
               :size="controlSize"
-              @click.stop="rowCanel(scopeRow.row,scopeRow.$index)"
-            >取 消</el-button>
+              :disabled="row.$btnDisabled"
+              @click.stop="rowCanel(row,$index)"
+            >{{parentOption.cancelBtnText || config.cancelBtnText}}</el-button>
             <!-- 操作列的slot -->
             <slot
               v-if="vaildData(tableOption.operation,!!$scopedSlots.operation)"
               :name="config.operationSlotName"
-              :scopeRow="scopeRow"
-              :row="scopeRow.row"
-              :column="scopeRow.column"
-              :index="scopeRow.$index"
-              :isEdit="vaildBoolean(scopeRow.row.$cellEdit,false)"
+              :scopeRow="{row,$index,column}"
+              :row="row"
+              :column="column"
+              :index="$index"
+              :isEdit="vaildBoolean(row.$cellEdit,false)"
+              :disabled="row.$btnDisabled"
               :size="controlSize"
             ></slot>
             <!-- 基础模式，如删除，编辑。参数为scopeRow -->
@@ -146,7 +181,7 @@
                 :size="btn.size || controlSize"
                 type="text"
                 :key="btn.label"
-                @click.stop="btn.handler(scopeRow)"
+                @click.stop="btn.handler({row,$index,column})"
               >
                 <i v-if="btn.icon" :class="btn.icon"></i>
                 {{btn.label}}
@@ -157,7 +192,7 @@
                 :size="btn.size || controlSize"
                 :key="btn.label"
                 :dropDown="btn"
-                :carryData="scopeRow"
+                :carryData="{row,$index,column}"
                 :style="{display:'inline-block'}"
               />
             </template>
@@ -211,6 +246,8 @@ import {
 import { detail } from "../../../utils/detail";
 import { DIC_SPLIT, EMPTY_VALUE } from "../../../global/variable";
 
+import headerSearch from '../header-search';
+
 //单双击冲突timer
 let dblclickTimer = null;
 let paginationTimer = null;
@@ -221,7 +258,7 @@ let preventClick = ["selection", "operation", "img"];
 export default {
   name: "zTable",
   mixins: [props("crud"), init("crud")],
-  components: { formTemp, column },
+  components: { formTemp, column, headerSearch },
   props: {
     propsHttp: {
       type: Object,
@@ -231,8 +268,13 @@ export default {
       type: Boolean,
       default: false
     },
+    search: {
+      type: Object,
+      default: () => ({})
+    },
     summaryMethod: Function,
     spanMethod: Function,
+    selectable: Function
   },
   provide() {
     return {
@@ -240,9 +282,9 @@ export default {
     };
   },
   data() {
-    let _this = this;
     return {
       config,
+      prevSelectedData: [], //表格当前多选数据
       selectedData: [], //表格当前多选数据
       allData: [], //保存数组原始数据，用来复原数据
       tableData: [], //表格传入数据，用作分页使用
@@ -292,9 +334,15 @@ export default {
       this.options.uiConfig.pagination = {};
     }
 
-    this._tableInit();
+    this._tableInit().then(res => {
+      this._dataIndexInit();
+      // 数据加载完成
+      this.$emit('onloadeddata', res, this);
+    }).catch((err) => {
+      // 数据未加载完成，报错
+      this.$emit('unloadeddata', err, this);
+    })
     this.handleLoadDic();
-    this._dataIndexInit();
   },
   mounted() {
     this.$nextTick(() => {
@@ -308,29 +356,40 @@ export default {
     asyncValidator,
     vaildBoolean,
     setPx,
+    $log(...args) {
+      console.log(...args);
+    },
     /**
      * 内部使用方法
      */
     _tableInit(reload) {
-      //服务器模式处理
-      // console.log(this.currentPage, this.pageSize);
-      if (this.isServerMode) {
-        this._loadServerMode(this.isServerMode.data);
-      } else {
-        //如果是刷新表格，如果data为空，说明是在外部使用ajax请求数据，则出现加载动画，3秒后加载动画关闭
-        //  || !this.options.data || this.options.data.length === 0
-        if (reload) {
-          this.loading = true;
-          setTimeout(() => {
-            this.loading = false;
-          }, 2000);
+      return new Promise((resolve, reject) => {
+        //服务器模式处理
+        // console.log(this.currentPage, this.pageSize);
+        if (this.isServerMode) {
+          this._loadServerMode(this.isServerMode.data).then((res) => {
+            resolve(res)
+          }).catch(err => {
+            reject(err);
+          })
+        } else {
+          //如果是刷新表格，如果data为空，说明是在外部使用ajax请求数据，则出现加载动画，3秒后加载动画关闭
+          //  || !this.options.data || this.options.data.length === 0
+          if (reload) {
+            this.loading = true;
+            setTimeout(() => {
+              this.loading = false;
+            }, 2000);
+          }
+
+          if (!this.options.data) this.options.data = [];
+
+          this._setTableData(this.options.data);
+          this.setTotal(this.options.data.length);
+
+          resolve({ data: this.options.data, total: this.options.data.length })
         }
-
-        if (!this.options.data) this.options.data = [];
-
-        this._setTableData(this.options.data);
-        this.setTotal(this.options.data.length);
-      }
+      })
     },
     // 检索
     _getFilterTableData() {
@@ -365,60 +424,73 @@ export default {
     },
     // 获取分页数据
     _getPatinationData() {
-      let currentPage = this.currentPage;
-      let pageSize = this.pageSize;
-      let paginationConfig = this.uiConfig.pagination;
+      return new Promise((resolve, reject) => {
+        let currentPage = this.currentPage;
+        let pageSize = this.pageSize;
+        let paginationConfig = this.uiConfig.pagination;
 
-      if (paginationConfig) {
-        //如果采用服务端分页模式
-        if (this.isServerMode) {
-          this._loadServerMode(
-            Object.assign(this.isServerMode.data, {
-              [this.pageSizeKey]: pageSize,
-              [this.pageNumKey]: currentPage
+        if (paginationConfig) {
+          //如果采用服务端分页模式
+          if (this.isServerMode) {
+            this._loadServerMode(
+              Object.assign(this.isServerMode.data, {
+                [this.pageSizeKey]: pageSize,
+                [this.pageNumKey]: currentPage
+              })
+            ).then(res => {
+              resolve(res)
+            }).catch(err => {
+              reject(err)
             })
-          );
-        } else {
-          //如果不是服务器模式
-          // 如果tableData.length >= total，说明allData是全部数据，使用tableData分页即可
-          if (this.tableData.length >= this.uiConfig.pagination.total) {
-            let currentIndex = currentPage * pageSize;
-            this.tableShowData = this.tableData.slice(
-              currentIndex - pageSize,
-              currentIndex
-            );
           } else {
-            // 否则直接显示设置数据
-            this.tableShowData = this.tableData;
+            //如果不是服务器模式
+            // 如果tableData.length >= total，说明allData是全部数据，使用tableData分页即可
+            if (this.tableData.length >= this.uiConfig.pagination.total) {
+              let currentIndex = currentPage * pageSize;
+              this.tableShowData = this.tableData.slice(
+                currentIndex - pageSize,
+                currentIndex
+              );
+            } else {
+              // 否则直接显示设置数据
+              this.tableShowData = this.tableData;
+            }
+            resolve();
           }
+        } else {
+          this.tableShowData = this.tableData;
+          resolve();
         }
-      } else {
-        this.tableShowData = this.tableData;
-      }
-
-      this.searchVal = "";
+        // 重置搜索数据
+        this.searchVal = "";
+      })
     },
     // 加载服务端数据
     _loadServerMode(data) {
-      let _this = this;
-      //加载中开始
-      this.loading = true;
+      return new Promise((resolve, reject) => {
+        //加载中开始
+        this.loading = true;
 
-      let serverMode = this.isServerMode;
-      let url = this.isServerMode.url;
-      this._axios({
-        mehtod: this.isServerMode.type,
-        url: url,
-        data: data
-      })
-        .then(res => {
-          this._setTableData(res[this.listKey]);
-          this.setTotal(res[this.totalKey]);
+        let serverMode = this.isServerMode;
+        let url = this.isServerMode.url;
+        this._axios({
+          mehtod: this.isServerMode.type,
+          url: url,
+          data: data
         })
-        .finally(() => {
-          //加载中结束
-          this.loading = false;
-        });
+          .then(res => {
+            this._setTableData(res[this.listKey]);
+            this.setTotal(res[this.totalKey]);
+            resolve(res);
+          })
+          .catch(err => {
+            reject(err);
+          })
+          .finally(() => {
+            //加载中结束
+            this.loading = false;
+          });
+      })
     },
     // AXIOS
     _axios({ mehtod = "get", url = "", data = {} }) {
@@ -451,8 +523,16 @@ export default {
       // 计算组件中$refs的高度
       for (const key in this.$refs) {
         if (this.$refs.hasOwnProperty(key)) {
-          const element = this.$refs[key];
-          if (element.clientHeight) {
+          const curRef = this.$refs[key];
+
+          let element = null;
+          if (curRef.nodeType === 1) {
+            element = curRef;
+          } else {
+            element = curRef.$el;
+          }
+
+          if (element.clientHeight && key !== 'dataBaseTable') {
             _height = _height - element.clientHeight;
           }
         }
@@ -462,7 +542,7 @@ export default {
       this.tableHeight = _height - 20;
     },
     _dataIndexInit() {
-      //初始化序列的参数
+      //初始化序列的参数 在外部拿到数据后，可以通过$index来进行 行编辑 函数调用
       (this.isServerMode ? this.tableShowData : this.tableData).forEach(
         (ele, index) => {
           if (ele.$cellEdit) {
@@ -507,7 +587,7 @@ export default {
       if (this.parentOption.expandOne) {
         this.toggleRowExpansion();
         if (expandedRows.length) {
-          (this.parentOption?.expandRowKeys || this.expandList).push(row[this.rowKey]);
+          this.expandList.push(row[this.rowKey]);
         }
       } else if (this._typeOf(expandedRows) === 'Array') {
         this.expandList = [...expandedRows];
@@ -567,8 +647,8 @@ export default {
       return sums;
     },
     //合并行
-    _tableSpanMethod(param) {
-      if (typeof this.spanMethod === "function") return this.spanMethod(param);
+    _tableSpanMethod(...args) {
+      if (typeof this.spanMethod === "function") return this.spanMethod(...args);
     },
     //树懒加载
     _treeLoad(tree, treeNode, resolve) {
@@ -577,42 +657,77 @@ export default {
         resolve(data);
       })
     },
+    // 当前行是否可多选
+    _selectable(...args) {
+      if (typeof this.selectable === 'function') return this.selectable(...args);
+      return true;
+    },
+    // 反选之前在当前页选中的项
+    _setPrevSelectedData() {
+      // 因为直接用prevSelectedData值，不能进行反选，所以
+      // 将rowKey取出来再从tableShowData中取值反选
+      const currentPageSelectedData = this.prevSelectedData[this.currentPage];
+      if (currentPageSelectedData) {
+        let prevSelectedRowKeys = currentPageSelectedData.map(item => item[this.rowKey]);
+
+        let prevSelected = this.tableShowData.filter(
+          (item, index) =>
+            prevSelectedRowKeys.includes(item[this.rowKey])
+        )
+
+        this.toggleSelection(prevSelected, true);
+      }
+    },
+    // 鼠标移入移出
+    _cellMouseEnter(row, column, cell, event) {
+      this.$emit('cell-mouse-enter', row, column, cell, event)
+    },
+    _cellMouseLeave(row, column, cell, event) {
+      this.$emit('cell-mouse-leave', row, column, cell, event)
+    },
 
     /**
      * 以下行编辑
      */
-    _editBtnText(row, index) {
-      return row.$cellEdit === true ? "保 存" : "编 辑";
+    _editBtnText(row) {
+      return row.$cellEdit === true ?
+        (this.parentOption.saveBtnText || this.config.saveBtnText) :
+        (this.parentOption.editBtnText || this.config.editBtnText);
     },
     formRulesInit() {
-      this.propOption.forEach(ele => {
-        if (ele.rules) this.formRules[ele.prop] = ele.rules;
-        if (ele.rules && ele.cell) this.formCellRules[ele.prop] = ele.rules;
-      });
-
-      for (const key in this.propOption) {
-        if (this.propOption.hasOwnProperty(key)) {
-          const item = this.propOption[key];
-          if (item.rules && item.disabled !== false && item.display !== false) {
-            let currentRules = item.rules;
+      for (let index = 0; index < this.propOption.length; index++) {
+        const item = this.propOption[index];
+        if (item.rules && item.disabled !== true && item.display !== false) {
+          let currentRules = item.rules;
+          // 添加进rules
+          if (Array.isArray(currentRules)) {
             // 必填时自动生成message
-            if (
-              validatenull(currentRules.validator) &&
-              (!currentRules.message || currentRules.message.trim().length === 0)
-            ) {
-              if (currentRules.required) {
-                currentRules.message = `必填，请填写${item.label}`;
-              }
-            }
-            // 添加进rules
-            if (Array.isArray(currentRules)) {
-              this.$set(this.formRules, item.prop, currentRules);
+            currentRules.forEach(currentRule => {
+              fillRequiredRule(currentRule, item);
+            });
+            this.$set(this.formRules, item.prop, currentRules);
+            if (item.cell) {
               this.$set(this.formCellRules, item.prop, currentRules);
-            } else if (this._typeOf(currentRules) === 'Object') {
-              this.$set(this.formRules, item.prop, [currentRules]);
+            }
+          } else if (this._typeOf(currentRules) === 'Object') {
+            // 必填时自动生成message
+            this.fillRequiredRule(currentRules, item);
+            this.$set(this.formRules, item.prop, [currentRules]);
+            if (item.cell) {
               this.$set(this.formCellRules, item.prop, [currentRules]);
             }
           }
+        }
+      }
+    },
+    // 必填时自动生成message
+    fillRequiredRule(currentRules, item) {
+      if (
+        validatenull(currentRules.validator) &&
+        (!currentRules.message || currentRules.message.trim().length === 0)
+      ) {
+        if (currentRules.required) {
+          currentRules.message = `必填，请填写${item.label}`;
         }
       }
     },
@@ -642,55 +757,82 @@ export default {
     },
     //行取消
     rowCanel(row, index) {
-      if (this.validatenull(row[this.rowKey])) {
-        this.tableShowData.splice(index, 1);
-        return;
+      if (row.$cellEdit) {
+        if (this.validatenull(row[this.rowKey])) {
+          this.tableShowData.splice(index, 1);
+          return;
+        }
+        // this.$set(row, '$cellEdit', false);
+        // 行编辑状态重设
+        this.rowCancelSaveCurStatus(row, index);
+        // 编辑取消事件
+        this.$emit("row-edit-cancel", row, index);
       }
-      this.formCascaderList[index].$cellEdit = false;
-      //设置行数据
-      this.$set(this.tableShowData, index, this.formCascaderList[index]);
-
-      this.formIndexList.splice(this.formIndexList.indexOf(index), 1);
-
-      // 编辑取消事件
-      this.$emit("row-edit-cancel", row, index);
     },
     // 单元格编辑
     rowCellEdit(row, index) {
-      row.$cellEdit = true;
-      this.$set(this.tableShowData, index, row);
+      if (!(row.$cellEdit === true)) {
+        row.$cellEdit = true;
+        this.$set(this.tableShowData, index, row);
+        // 行编辑状态保存
+        this.rowEditSaveCurStatus(row, index);
+        // 编辑事件
+        this.$emit("row-edit", row, index);
+      }
+    },
+    //单元格更新
+    rowCellUpdate(row, index) {
+      return new Promise((resolve, reject) => {
+        this.asyncValidator(this.formCellRules, row).then(res => {
+          this.$set(row, '$btnDisabled', true);
+
+          // 返回参数
+          const cbParams = [row, index,
+            () => {
+              /* row.$cellEdit = false;
+              this.$set(this.tableShowData, index, row); */
+              this.$set(row, '$cellEdit', false);
+              this.$set(row, '$btnDisabled', false);
+              this.formCascaderList[index] = row;
+            }, () => {
+              this.$set(row, '$btnDisabled', false);
+            }
+          ]
+
+          this.$emit("row-update", ...cbParams);
+
+          resolve(...cbParams)
+          // 通过promise返回
+        }).catch(errors => {
+          setTimeout(() => {
+            errors[0].message = `第${index + 1}行：${errors[0].message}`;
+            this.$message.warning(errors[0]);
+          }, 0);
+          reject(errors)
+        });
+      })
+    },
+    rowEditSaveCurStatus(row, index) {
       //缓冲行数据
       this.formCascaderList[index] = this.deepClone(row);
-
-      // 编辑事件
-      this.$emit("row-edit", row, index);
-
       setTimeout(() => {
         this.formIndexList.push(index);
       }, 1000);
     },
-    //单元格更新
-    rowCellUpdate(row, index) {
-      this.btnDisabled = true;
-      this.asyncValidator(this.formCellRules, row)
-        .then(res => {
-          this.$emit(
-            "row-update",
-            row,
-            index,
-            () => {
-              row.$cellEdit = false;
-              this.$set(this.tableShowData, index, row);
-            },
-            () => {
-              this.btnDisabled = false;
-            }
-          );
-        })
-        .catch(errors => {
-          errors[0].message = `第${index + 1}行：${errors[0].message}`;
-          this.$message.warning(errors[0]);
-        });
+    rowCancelSaveCurStatus(row, index) {
+      let cacheRow = this.formCascaderList[index];
+      // 如果没有缓存数据，则为当前行数据
+      if (!cacheRow) {
+        cacheRow = this.tableShowData[index];
+      }
+      // 将编辑状态改变
+      cacheRow.$cellEdit = false;
+      // 重新设置回行数据
+      this.$set(this.tableShowData, index, cacheRow);
+
+      this.formIndexList.splice(this.formIndexList.indexOf(index), 1);
+
+      this.clearSelection();
     },
 
     /**
@@ -741,7 +883,7 @@ export default {
 
       let row = this.tableShowData[index];
       let column = this.columnConfig[index];
-      this.Table.setCurrentRow(row);
+      this.$refs.dataBaseTable.setCurrentRow(row);
       this.$emit("row-click", row, column);
     },
     //多选选择当前项
@@ -757,26 +899,26 @@ export default {
        * rowsIndex为  [0,2,5]形式的行标号 或 [row,row,row] 或 0 或 row
        * selectedArr为 [true,false] 或 true 形式的boolean数组，表明对应行选中与否
        */
-      if (rowsIndex) {
+      if (typeof rowsIndex !== 'undefined') {
         // 如果选中状态时数组
         if (Array.isArray(rowsIndex)) {
           for (let index = 0; index < rowsIndex.length; index++) {
             const row = typeof rowsIndex[index] === 'number'
-              ? this.tableShowData[rowsIndex[index] - 1]
+              ? this.tableShowData[rowsIndex[index]]
               : rowsIndex[index];
             const rowSelected = Array.isArray(selectedArr)
               ? selectedArr[index]
               : selectedArr;
             if (!row) continue;
 
-            this.Table.toggleRowSelection(row, rowSelected);
+            this.$refs.dataBaseTable.toggleRowSelection(row, rowSelected);
           }
         } else {
           const row = typeof rowsIndex === 'number'
-            ? this.tableShowData[rowsIndex[index] - 1]
+            ? this.tableShowData[rowsIndex]
             : rowsIndex;
 
-          this.Table.toggleRowSelection(row, selectedArr);
+          this.$refs.dataBaseTable.toggleRowSelection(row, selectedArr);
         }
       } else {
         this.clearSelection();
@@ -784,7 +926,7 @@ export default {
     },
     //多选切换全选状态
     toggleAllSelection() {
-      this.Table.toggleAllSelection();
+      this.$refs.dataBaseTable.toggleAllSelection();
     },
     //用于可展开表格与树形表格
     toggleRowExpansion(rowsIndex, expanded) {
@@ -793,29 +935,29 @@ export default {
         return;
       }
 
-      if (rowsIndex) {
+      if (typeof rowsIndex !== 'undefined') {
         if (Array.isArray(rowsIndex)) {
           for (let index = 0; index < rowsIndex.length; index++) {
             const curRowExpanded = Array.isArray(expanded)
               ? expanded[index]
               : expanded;
             const row = typeof rowsIndex[index] === 'number'
-              ? this.tableShowData[rowsIndex[index] - 1]
+              ? this.tableShowData[rowsIndex[index]]
               : rowsIndex[index];
             if (!row) continue;
 
-            this.Table.toggleRowExpansion(row, curRowExpanded);
+            this.$refs.dataBaseTable.toggleRowExpansion(row, curRowExpanded);
           }
         } else {
           const row = typeof rowsIndex === 'number'
-            ? this.tableShowData[rowsIndex - 1]
+            ? this.tableShowData[rowsIndex]
             : rowsIndex;
 
-          this.Table.toggleRowExpansion(row, expanded);
+          this.$refs.dataBaseTable.toggleRowExpansion(row, expanded);
         }
       } else {
         // 此处关联着options.expandRowKyes，改变都改变
-        (this.options?.expandRowKeys || this.expandList).length = 0;
+        this.expandList.length = 0;
       }
     },
     //点击排序触发
@@ -873,21 +1015,34 @@ export default {
     },
     //多选清除选择项
     clearSelection() {
-      this.Table.clearSelection();
+      this.$refs.dataBaseTable.clearSelection();
     },
     //重新布局
     doLayout() {
-      this.Table.doLayout();
+      this.$refs.dataBaseTable.doLayout();
       this.key++;
     },
     // 清除排序
     clearSort() {
-      this.Table.clearSort();
+      this.$refs.dataBaseTable.clearSort();
       this.tableData = this.allData;
     },
     // 清除过滤
     clearFilter(columnKey) {
-      this.Table.clearFilter(columnKey);
+      this.$refs.dataBaseTable.clearFilter(columnKey);
+    },
+
+    /**
+     * search form
+     */
+    searchReset() {
+      this.$refs.headerSearch.reset();
+    },
+    searchSubmit() {
+      this.$refs.headerSearch.submit();
+    },
+    searchShow(isShow) {
+      this.$refs.headerSearch.handleSearchShow(isShow);
     },
 
     /**
@@ -896,6 +1051,24 @@ export default {
     //get
     getSelectedData() {
       return this.selectedData;
+    },
+    // 表格全部选中数据
+    getAllSelectedData() {
+      /* if (!this.prevSelectedData.length) {
+        return this.selectedData;
+      } else {
+        return this.prevSelectedData.reduce(
+          (prev, cur, curIndex) => {
+            if (curIndex === this.currentPage) {
+              prev = prev.concat(this.selectedData)
+            } else {
+              this._typeOf(cur) === 'Array' ? prev = prev.concat(cur) : prev
+            }
+            return prev;
+          }, []
+        );
+      } */
+      return this.allSelectedData;
     },
     //set
     // 设置表格数据
@@ -922,10 +1095,12 @@ export default {
     },
     //refresh
     refreshTable() {
-      this._tableInit(true);
-      this.doLayout();
-      // 清空多选数据
-      this.selectedData = [];
+      return new Promise((resolve, reject) => {
+        this._tableInit(true).then(res => resolve(res)).catch(err => reject(err));
+        this.doLayout();
+        // 清空多选数据
+        this.selectedData = [];
+      })
     },
     //搜索指定的属性配置
     findColumnIndex(prop) {
@@ -957,9 +1132,6 @@ export default {
     }
   },
   computed: {
-    Table() {
-      return this.$refs.dataBaseTable;
-    },
     columnConfig: {
       get() {
         if (this.options.columnConfig) {
@@ -974,23 +1146,30 @@ export default {
       }
     },
     btnConfig() {
-      // 如果有operation，则代表要使用slot的列操作，权重为最高
-      let operation = this.options.operation;
-      if (operation) {
-        if (typeof operation === "boolean") {
-          this.options.btnConfig = this.config.defaultBtnConfig;
-        } else if (typeof operation === "object") {
-          // 设置默认值
-          setDefaultValue(this.config.defaultBtnConfig, operation, this);
-          this.options.btnConfig = operation;
-        }
+      let { operation, btnConfig } = this.options;
+
+      // 如果都没有配置，则没有操作列
+      if (!(operation || btnConfig)) {
+        return false;
       }
-      return this.options.btnConfig ? this.options.btnConfig : false;
+
+      let returnConfig = this.config.defaultBtnConfig;
+      // 如果有btnConfig，则将btnConfig和defaultBtnConfig合并
+      if (this._typeOf(btnConfig) === "Object") {
+        returnConfig = setDefaultValue(btnConfig, this.config.defaultBtnConfig, this)
+      }
+
+      // 如果有operation，则代表要使用slot的列操作，权重为最高
+      if (this._typeOf(operation) === "Object") {
+        returnConfig = setDefaultValue(returnConfig, operation, this);
+      }
+
+      return returnConfig;
     },
     uiConfig() {
       let uiConfig = this.options.uiConfig || {};
       // 设置默认值
-      setDefaultValue(this.config.defaultUiConfig, uiConfig, this);
+      uiConfig = setDefaultValue(this.config.defaultUiConfig, uiConfig, this);
       // 初始化currentPage和pageSize
       this.currentPage = uiConfig.pagination.currentPage;
       this.pageSize = uiConfig.pagination.pageSize;
@@ -1070,6 +1249,30 @@ export default {
         return `${this.tableOption.headerRowClassName} ${defaultClass}`;
       }
       return defaultClass;
+    },
+    // 表格全部选中数据
+    // 此处反显时执行次数太多，后期如果有性能问题，改为方法获取
+    allSelectedData() {
+      // 是否跨页多选
+      if (this.uiConfig.multiSelection) {
+        let res = [];
+        if (!this.prevSelectedData.length) {
+          res = this.selectedData;
+        } else {
+          return this.prevSelectedData.reduce(
+            (prev, cur, curIndex) => {
+              if (curIndex === this.currentPage) {
+                prev = prev.concat(this.selectedData)
+              } else {
+                this._typeOf(cur) === 'Array' ? prev = prev.concat(cur) : prev
+              }
+              return prev;
+            }, res
+          );
+        }
+        return res;
+      }
+      return [];
     }
   },
   watch: {
@@ -1112,15 +1315,37 @@ export default {
           //为防止在极短的时间内重复请求
           clearTimeout(paginationTimer);
           paginationTimer = setTimeout(() => {
-            // 如果有handler，则拦截分页方法。为了兼容服务端自己写请求数据方法
-            if (this.uiConfig.pagination.handler) {
-              this.uiConfig.pagination.handler(newVal.pageSize, newVal.currentPage, this);
-              return;
-            }
             // 触发pagination方法
             this.$emit("handle-pagination", newVal.pageSize, newVal.currentPage, this);
+
+            // 是否跨页多选
+            if (this.uiConfig.multiSelection) {
+              // 将当前页选中数据缓存
+              this.prevSelectedData[oldVal.currentPage] = this.selectedData;
+            }
+
+            // 如果有handler，则拦截分页方法。为了兼容服务端自己写请求数据方法
+            if (this.uiConfig.pagination.handler) {
+              let returnedValue = this.uiConfig.pagination.handler(newVal.pageSize, newVal.currentPage, this);
+              // 如果返回一个promise则执行跨页多选
+              if (this._typeOf(returnedValue) === 'Promise') {
+                returnedValue.then(_ => {
+                  // 是否跨页多选
+                  if (this.uiConfig.multiSelection) {
+                    this._setPrevSelectedData();
+                  }
+                })
+              }
+              return;
+            }
+
             // 加载分页
-            this._getPatinationData();
+            this._getPatinationData().then(_ => {
+              // 是否跨页多选
+              if (this.uiConfig.multiSelection) {
+                this._setPrevSelectedData();
+              }
+            })
           }, 0);
         }
       }
@@ -1232,6 +1457,12 @@ export default {
   .el-table__footer-wrapper {
     td {
       padding: 0 !important;
+    }
+  }
+  // 列操作兼容span间隔，否则span和button会紧贴着
+  .zvue-table_operation {
+    span + .el-button {
+      margin-left: 10px;
     }
   }
 }

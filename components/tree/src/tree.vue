@@ -22,6 +22,19 @@
       :node-key="nodeKey"
       :filter-node-method="filterNode"
       :expand-on-click-node="false"
+      :render-content="renderContent"
+      :allow-drop="allowDrop"
+      :allow-drag="allowDrag"
+      @check="(...args)=>{this.$emit('check',...args)}"
+      @current-change="(...args)=>{this.$emit('current-change',...args)}"
+      @node-expand="(...args)=>{this.$emit('node-expand',...args)}"
+      @node-collapse="(...args)=>{this.$emit('node-collapse',...args)}"
+      @node-drag-start="(...args)=>{this.$emit('node-drag-start',...args)}"
+      @node-drag-enter="(...args)=>{this.$emit('node-drag-enter',...args)}"
+      @node-drag-leave="(...args)=>{this.$emit('node-drag-leave',...args)}"
+      @node-drag-over="(...args)=>{this.$emit('node-drag-over',...args)}"
+      @node-drag-end="(...args)=>{this.$emit('node-drag-end',...args)}"
+      @node-drop="(...args)=>{this.$emit('node-drop',...args)}"
       @check-change="handleCheckChange"
       @node-click="nodeClick"
       @node-contextmenu="nodeContextmenu"
@@ -42,7 +55,7 @@
         <div class="zvue-tree_item" v-if="vaildData(options.addBtn,false)" @click="rowAdd">新增</div>
         <div class="zvue-tree_item" v-if="vaildData(options.editBtn,false)" @click="rowEdit">修改</div>
         <div class="zvue-tree_item" v-if="vaildData(options.delBtn,false)" @click="rowRemove">删除</div>
-        <slot name="menu" :node="node" :Tree="instance"></slot>
+        <slot name="menu" :node="node" :Tree="$refs.tree"></slot>
       </div>
     </transition>
 
@@ -85,6 +98,15 @@ export default {
       default: () => {
         return {};
       }
+    },
+    renderContent: {
+      type: Function
+    },
+    allowDrop: {
+      type: Function
+    },
+    allowDrag: {
+      type: Function
     }
   },
   data() {
@@ -99,14 +121,10 @@ export default {
       type: "",
       node: {},
       obj: {},
-      form: {},
-      instance: null
+      form: {}
     };
   },
   computed: {
-    Tree() {
-      return this.$refs.tree
-    },
     styleName() {
       return {
         top: this.setPx(this.client.y - 10),
@@ -195,7 +213,6 @@ export default {
   },
   mounted() {
     this.initFun();
-    this.instance = this.Tree;
   },
   watch: {
     options() {
@@ -217,9 +234,12 @@ export default {
     },
     initFun() {
       [
-        'filter', 'updateKeyChildren', 'getCheckedNodes', 'setCheckedNodes', 'getCheckedKeys',
-        'setCheckedKeys', 'setChecked', 'getHalfCheckedNodes', 'getHalfCheckedKeys', 'getCurrentKey', 'getCurrentNode',
-        'setCurrentKey', 'setCurrentNode', 'getNode', 'remove', 'append', 'insertBefore', 'insertAfter'
+        'filter', 'updateKeyChildren', 'getCheckedNodes',
+        'setCheckedNodes', 'getCheckedKeys', 'setCheckedKeys',
+        'setChecked', 'getHalfCheckedNodes', 'getHalfCheckedKeys',
+        'getCurrentKey', 'getCurrentNode', 'setCurrentKey',
+        'setCurrentNode', 'getNode', 'remove',
+        'append', 'insertBefore', 'insertAfter'
       ].forEach(ele => {
         this[ele] = this.$refs.tree[ele];
       })

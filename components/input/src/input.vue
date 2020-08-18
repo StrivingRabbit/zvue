@@ -15,7 +15,7 @@
     :disabled="disabled"
     :autocomplete="autocomplete"
     :show-password="showPassword"
-    :autosize="{minRows:minRows,maxRows:maxRows}"
+    :autosize="{minRows:minRows > maxRows ? maxRows : minRows,maxRows:maxRows}"
     @focus="handleFocus"
     @blur="handleBlur"
     @click.native="handleClick"

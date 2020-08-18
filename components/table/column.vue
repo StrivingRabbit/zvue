@@ -22,6 +22,10 @@
         :align="col.align || parentOption.align || config.align"
         :header-align="col.headerAlign || parentOption.headerAlign || config.headerAlign"
         :render-header="col.renderHeader"
+        filter-placement="bottom-end"
+        :filters="_handleFilters(col)"
+        :filter-method="col.filter? _handleFiltersMethod : undefined"
+        :filter-multiple="vaildBoolean(col.filterMultiple,true)"
       >
         <template v-if="col.headerSlot" slot="header">
           <slot :name="`${col.prop}Header`" :column="col"></slot>
@@ -36,7 +40,9 @@
             :row="scopeRow.row"
             :size="controlSize"
             :column="col"
-            :disabled="col.disabled"
+            :readonly="col.readonly"
+            :clearable="vaildBoolean(col.clearable,true)"
+            :disabled="vaildBoolean(col.disabled,scopeRow.row.$btnDisabled)"
             :isEdit="cellEditFlag(scopeRow.row,col)"
             :dic="DIC[col.prop]"
           ></slot>
@@ -49,15 +55,15 @@
             :dic="DIC[col.prop]"
             :upload-before="col.uploadBefore"
             :upload-after="col.uploadAfter"
-            :disabled="col.disabled"
+            :readonly="col.readonly"
+            :clearable="vaildBoolean(col.clearable,true)"
+            :disabled="vaildBoolean(col.disabled,scopeRow.row.$btnDisabled)"
             :textMode="col.textMode"
             @click.native.stop
             @input="modelInput($event,scopeRow.row,col)"
           ></form-temp>
           <template v-else>
-            <span
-              v-if="['array'].includes(col.type)"
-            >{{_detailData(getValueByPath(scopeRow.row, col.prop),col).join(' | ')}}</span>
+            <span v-if="['array'].includes(col.type)">{{_detailData(scopeRow,col)}}</span>
             <span v-else-if="['url'].includes(col.type)">
               <el-link
                 type="primary"
@@ -103,7 +109,7 @@ import { detail } from "../../utils/detail";
 import { validatenull } from "../../utils/validate";
 import { deepClone, vaildBoolean } from "../../utils/util";
 import formTemp from "../formtemp";
-import { DIC_SPLIT, EMPTY_VALUE } from "../../global/variable";
+import { DIC_PROPS, DIC_SPLIT, EMPTY_VALUE } from "../../global/variable";
 import multiHeaderColumn from './multiHeaderColumn';
 import zImg from './z-img';
 
@@ -140,13 +146,18 @@ export default {
       // console.log("isEdit", row, column, row.$cellEdit && column.cell);
       return !!(row.$cellEdit && column.cell);
     },
-    _detailData(list, { dataType, props: { label } }) {
+    _detailData({ row }, col) {
+      let { prop, dataType, props: { label } } = col
+      let list = this.getValueByPath(row, prop);
+      let res = EMPTY_VALUE;
+
       if (!Array.isArray(list) && ["string", "number"].includes(dataType)) {
-        return list.split(",");
-      } else if (Array.isArray(list)) {
-        return list.map(item => item[label]);
+        res = list.split(",").join(' | ');
+      } else if (Array.isArray(list) && list.length) {
+        res = list.map(item => item[label]).join(' | ');
       }
-      return list;
+
+      return res;
     },
     // 由于slot-scope和formatter不能共存只能如此
     _columnFormatter(scopeRow, currentColumn) {
@@ -208,6 +219,33 @@ export default {
       let parentObj = this.getPropByPath(model, prop).o;
       parentObj[prop.split('.').pop()] = value;
     },
+    //表格筛选逻辑
+    _handleFiltersMethod(value, row, column) {
+      const columnNew = this.columnConfig.filter(
+        ele => ele.prop === column.property
+      )[0];
+      if (typeof columnNew.filtersMethod === "function") {
+        return columnNew.filtersMethod(value, row, columnNew);
+      } else {
+        return row[columnNew.prop] === value;
+      }
+    },
+    //表格筛选字典
+    _handleFilters(column) {
+      if (column.filter !== true) return undefined;
+      if (this.validatenull(column.dicFilters)) {
+        let list = [];
+        (this.DIC[column.prop] || []).forEach(ele => {
+          const props = column.props || this.tableOption.props || {};
+          list.push({
+            text: ele[props.label || DIC_PROPS.label],
+            value: ele[props.value || DIC_PROPS.value]
+          });
+        });
+        return list;
+      }
+      return column.dicFilters;
+    }
   }
 };
 </script>

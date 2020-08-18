@@ -3,15 +3,17 @@
     v-if="showDisplayValue && !noTextMode"
     class="text-overflow-eliipsis"
     :title="displayValue"
+    ref="temp"
   >
     <!-- <slot v-else :name="column.prependSlot" :textMode="textMode"></slot> -->
     <span v-if="column.prepend && comDisplayValue !== EMPTY_VALUE">{{column.prepend}}</span><!--
-    --><span>{{comDisplayValue}}</span><!--
+    --><span v-html="comDisplayValue"></span><!--
     --><span v-if="column.append && comDisplayValue !== EMPTY_VALUE">{{column.append}}</span>
     <!-- <slot v-else :name="column.appendSlot" :textMode="textMode"></slot> -->
   </div>
   <component
     v-else
+    ref="temp"
     :class="{'zvue-text-mode':(showDisplayValue && noTextMode)}"
     :is="getComponent(column.type,column.component)"
     :placeholder="getPlaceholder(column,column.type,comDisabled)"

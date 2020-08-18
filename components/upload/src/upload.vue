@@ -254,10 +254,10 @@ export default {
       this.setVal();
     },
     handleError(msg) {
-      console.error(new Error(msg));
-      this.$message.error(typeof msg === "string" ? msg : "上传失败");
       if (typeof this.uploadError === 'function') {
-        this.uploadError(error, this.column);
+        this.uploadError(msg, this.column);
+      } else {
+        this.$message.error(typeof msg === "string" ? msg : "上传失败");
       }
     },
     delete(file) {
@@ -425,7 +425,11 @@ export default {
       this.dialogImageUrl = file.url;
       if (!/\.(gif|jpg|jpeg|png|GIF|JPG|PNG)/.test(file.url)) {
         this.dialogImgType = false;
-        window.open(this.dialogImageUrl);
+        if (typeof this.column.preview === 'function') {
+          this.column.preview(file);
+        } else {
+          window.open(this.dialogImageUrl);
+        }
         return;
       } else {
         this.initialIndex = this.fileList.map(item => item.url).indexOf(file.url);

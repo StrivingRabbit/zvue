@@ -30,9 +30,9 @@
         :disabled="group.disabled"
       >
         <el-option
-          v-for="oitem in group[groupsKey]"
+          v-for="(oitem,index) in group[groupsKey]"
           :disabled="oitem[disabledKey]"
-          :key="validatenull(oitem[valueKey]) || getLabelText(oitem)"
+          :key="index"
           :label="getLabelText(oitem)"
           :value="oitem[valueKey]"
         >
@@ -42,9 +42,9 @@
     </template>
     <template v-else>
       <el-option
-        v-for="oitem in visibleDic"
+        v-for="(oitem,index) in visibleDic"
         :disabled="oitem[disabledKey]"
-        :key="validatenull(oitem[valueKey]) || getLabelText(oitem)"
+        :key="index"
         :label="getLabelText(oitem)"
         :value="oitem[valueKey]"
       >
@@ -88,7 +88,7 @@ export default {
     },
     collapseTags: {
       type: Boolean,
-      default: true
+      default: false
     },
     limit: {
       type: Number,

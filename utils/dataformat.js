@@ -39,7 +39,7 @@ let typeMap = {
 export const getComponent = function (type, component) {
     let result = 'input';
     if (!validatenull(component)) {
-        result = component;
+        return component;
     } else if (typeMap[type]) {
         result = typeMap[type];
     } else if (dateList.includes(type)) {
@@ -52,26 +52,24 @@ export const getPlaceholder = function (column, type, isDisabled) {
     // return column.placeholder;
     const placeholder = column.placeholder;
     const label = column.label;
-    /* if (type === 'search') {
+    // 如果禁用状态，则取消占位显示
+    if (isDisabled === true) {
+        return '';
+    }
+    if (type === 'search') {
         const searchPlaceholder = column.searchPlaceholder;
         if (!validatenull(searchPlaceholder)) {
             return searchPlaceholder;
         } else {
             return label;
         }
-    } else  */
-    // 如果禁用状态，则取消占位显示
-    if (isDisabled === true) {
-        return '';
-    }
-    if (validatenull(placeholder)) {
+    } else if (validatenull(placeholder)) {
         if (['select', 'checkbox', 'cascader', 'radio', 'tree'].includes(column.type)) {
-            return `请选择 ${label}`;
+            return `请选择 ${label ? label : ''}`;
         } else {
-            return `请输入 ${label}`;
+            return `请输入 ${label ? label : ''}`;
         }
     }
-
     return placeholder;
 }
 
@@ -161,29 +159,14 @@ export const getSearchType = (column, component = false) => {
     if (['select', 'radio', 'checkbox', 'switch'].includes(type)) {
         result = 'select';
     } else if (dateList.includes(type)) {
+        let rangeKey = 'range';
         if (range) {
-            if (type === 'date') {
-                result = 'daterange';
-            } else if (type === 'datetime') {
-                result = 'datetimerange';
-            } else if (type === 'time') {
-                result = 'timerange';
+            if (!type.includes(rangeKey)) {
+                result = type + rangeKey;
             } else {
                 result = type;
             }
-        } else {
-            if (type === 'daterange') {
-                result = 'date';
-            } else if (type === 'datetimerange') {
-                result = 'datetime';
-            } else if (type === 'timerange') {
-                result = 'time';
-            } else {
-                result = type;
-            }
-        }
-    } else if (['cascader'].includes(type)) {
-        result = 'cascader';
+        } else result = type.replace(rangeKey, '');
     } else if (['number'].includes(type)) {
         result = 'input-number';
     } else if (['textarea'].includes(type)) {

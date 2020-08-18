@@ -14,7 +14,6 @@
     :placeholder="placeholder"
     :picker-options="pickerOptions"
     :arrow-control="arrowControl"
-    @change="handleChange"
     @click.native="handleClick"
     :disabled="disabled"
   ></el-time-picker>
@@ -69,6 +68,12 @@ export default {
     isRange() {
       return this.type === "timerange";
     }
+  },
+  watch: {
+    text(val) {
+      this.handleChange(val);
+    },
+    deep: true
   }
 };
 </script>

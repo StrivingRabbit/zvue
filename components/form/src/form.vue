@@ -1,5 +1,12 @@
 <template>
-  <div class="zvue-form-wrapper" :style="{width:setPx(parentOption.width,'100%')}">
+  <div
+    class="zvue-form-wrapper"
+    :style="{
+      width:setPx(parentOption.width,'100%'),
+      maxWidth:setPx(parentOption.maxWidth,'100%'),
+      minWidth:setPx(parentOption.minWidth,'50%')
+    }"
+  >
     <el-card :body-style="{ padding: '0px' }" shadow="never">
       <div
         class="clearfix"
@@ -28,6 +35,7 @@
         :hide-required-asterisk="parentOption.hideRequiredAsterisk"
         :show-message="parentOption.showMessage"
         :inline-message="parentOption.inlineMessage"
+        :validate-on-rule-change="vaildData(parentOption.validateOnRuleChange,false)"
       >
         <el-row :span="24">
           <!-- :display="item.display" -->
@@ -49,13 +57,11 @@
               <template v-for="(column, cindex) in group.forms">
                 <el-col
                   :key="column.prop"
-                  :span="column.span || itemSpanDefault"
-                  :offset="column.offset || 0"
                   :push="column.push || 0"
                   :pull="column.pull || 0"
                   :xs="{span:column.span < 24 ? 24 : column.span,offset:0}"
                   :sm="{span:column.span < 12 ? 12 : column.span,offset:0}"
-                  :md="column.span < 8 ? 8 : column.span"
+                  :md="{span:column.span < 8 ? 8 : column.span,offset:column.offset || 0}"
                   :lg="column.span || itemSpanDefault"
                   v-show="vaildData(!column.hide,true)"
                   v-if="vaildDisplay(column)"
@@ -65,14 +71,15 @@
                   }"
                 >
                   <el-form-item
-                    :class="[validatenull(column.label)?'zvue-form-item_emptylabel' : '']"
-                    :label="column.label"
+                    :class="[column.label === false ? 'zvue-form-item_emptylabel' : '']"
+                    :label="column.label === false ? '' : column.label"
                     :prop="column.prop"
                     :required="column.required"
                     :error="column.error"
                     :show-message="column.showMessage"
                     :inline-message="column.inlineMessage"
                     :size="column.size || controlSize"
+                    :style="column.style || parentOption.elFormItemStyle"
                     :label-width="setPx(column.width,validatenull(parentOption.labelWidth) ? 90 : parentOption.labelWidth)"
                   >
                     <!-- 自定义label -->
@@ -126,6 +133,7 @@
                       <!-- v-model="model[column.prop]" -->
                       <form-temp
                         v-else
+                        :ref="column.prop"
                         :value="getValueByPath(model,column.prop)"
                         :column="column"
                         :dic="DIC[column.prop]"
@@ -194,31 +202,28 @@
                   v-if="column.row && column.span!==24 && column.count"
                 ></el-col>
               </template>
+              <slot name="search"></slot>
+              <el-col
+                :span="parentOption.menuSpan || 5"
+                v-if="vaildData(parentOption.menuBtn,true) && parentOption.lineMenu === true"
+              >
+                <form-menu @submit="submit" @resetForm="resetForm">
+                  <template #menuBtn>
+                    <slot name="menuBtn" v-bind="slotProps"></slot>
+                  </template>
+                </form-menu>
+              </el-col>
             </div>
           </z-group>
-          <el-col :span="24" v-if="vaildData(parentOption.menuBtn,true)">
-            <el-form-item>
-              <!-- 菜单按钮组 -->
-              <div :class="`zvue-form-menu-${menuPosition}`">
-                <el-button
-                  type="primary"
-                  @click="submit"
-                  :size="controlSize"
-                  icon="el-icon-check"
-                  :loading="vaildBoolean(parentOption.submitDisabled,allDisabled)"
-                  v-if="vaildData(parentOption.submitBtn,true)"
-                >{{vaildData(parentOption.submitText,'确 定')}}</el-button>
-                <el-button
-                  icon="el-icon-delete"
-                  :size="controlSize"
-                  :loading="vaildBoolean(parentOption.emptyDisabled,allDisabled)"
-                  v-if="vaildData(parentOption.emptyBtn,true)"
-                  @click="resetForm"
-                >{{vaildData(parentOption.emptyText,'清 空')}}</el-button>
-                <slot name="menuBtn" v-bind="slotProps"></slot>
-              </div>
-            </el-form-item>
-          </el-col>
+          <form-menu
+            @submit="submit"
+            @resetForm="resetForm"
+            v-if="vaildData(parentOption.menuBtn,true) && !parentOption.lineMenu"
+          >
+            <template #menuBtn>
+              <slot name="menuBtn" v-bind="slotProps"></slot>
+            </template>
+          </form-menu>
         </el-row>
       </el-form>
     </el-card>
@@ -244,6 +249,7 @@ import init from "../../../common/init";
 import formTemp from "../../formtemp";
 import { validatenull } from "../../../utils/validate";
 import { detail } from "../../../utils/detail";
+import formMenu from '../menu';
 
 const setDefaultValue = function (defaultOptions, options, vm) {
   _objKeysForeach(defaultOptions, function (key, value, index) {
@@ -256,7 +262,12 @@ let modelInputTimer = null;
 export default {
   name: "zForm",
   mixins: [init()],
-  components: { formTemp },
+  provide() {
+    return {
+      formSafe: this
+    };
+  },
+  components: { formTemp, formMenu },
   props: {
     uploadBefore: Function,
     uploadAfter: Function,
@@ -287,11 +298,10 @@ export default {
       model: {}, // 表单的model
       modelTranslate: {}, // 翻译的值
       allDisabled: false,
-      noModelFileds: [] // 不返回的model值
+      noModelFields: [] // 不返回的model值
     };
   },
   created() {
-    // console.log("form create");
     //初始化字典
     this.columnOption.forEach(ele => {
       this.handleLoadDic(ele).then(res => {
@@ -300,15 +310,20 @@ export default {
     });
     // 初始化表单
     this.dataFormat();
-
     this.$root._zForm = this;
   },
   mounted() {
+    // 意图消除表单最后一行的margin-bottom，但是由于form会根据屏幕改变布局，并不知道最后一行是谁，因此无法消除。
     /* setTimeout(() => {
-      if (this.options.menuBtn === false) {
+      if (this.parentOption.menuBtn === false) {
         const wrap = document.querySelector('.zvue-form-wrapper');
         const zGroup = wrap.querySelectorAll('.z-group');
-        console.log("mounted -> zGroup", zGroup)
+        zGroup.forEach(curGroup => {
+          const curCol = curGroup.querySelectorAll('.el-col');
+          const lastCol = curCol[curCol.length - 1];
+          const elFormItem = lastCol.querySelectorAll('.el-form-item');
+          elFormItem.forEach(item => item.style.marginBottom = '0px')
+        });
       }
     }, 0); */
   },
@@ -326,25 +341,34 @@ export default {
       this.model = deepClone(this.modelDefault.tableForm);
       this.formVal();
     },
-    formRulesInit() {
-      for (const key in this.propOption) {
-        if (this.propOption.hasOwnProperty(key)) {
-          const item = this.propOption[key];
+    formRulesInit(options) {
+      const propsArr = options || this.propOption;
+      let RulesObject = {};
 
-          if (item.rules && item.disabled !== false && item.display !== false) {
-            let currentRules = item.rules;
-            // 添加进rules
-            if (Array.isArray(currentRules)) {
-              currentRules.forEach(currentRule => {
-                this.fillRequiredRule(currentRule, item);
-              });
-              this.$set(this.formRules, item.prop, currentRules);
-            } else if (this._typeOf(currentRules) === 'Object') {
-              this.fillRequiredRule(currentRules, item);
-              this.$set(this.formRules, item.prop, [currentRules]);
-            }
+      for (let index = 0; index < propsArr.length; index++) {
+        const item = propsArr[index];
+        // 如果禁用或者不渲染，则不加入校验规则
+        if (item.rules && item.disabled !== true && item.display !== false) {
+          let currentRules = item.rules;
+          // 添加进rules
+          if (Array.isArray(currentRules)) {
+            currentRules.forEach(currentRule => {
+              this.fillRequiredRule(currentRule, item);
+            });
+            RulesObject[item.prop] = currentRules;
+            // this.$set(this.formRules, item.prop, currentRules);
+          } else if (this._typeOf(currentRules) === 'Object') {
+            this.fillRequiredRule(currentRules, item);
+            RulesObject[item.prop] = [currentRules];
+            // this.$set(this.formRules, item.prop, [currentRules]);
           }
         }
+      }
+
+      if (!options) {
+        this.formRules = RulesObject;
+      } else {
+        return RulesObject;
       }
     },
     // 必填时自动生成message
@@ -360,6 +384,8 @@ export default {
       }
     },
     formVal() {
+      // 如果formCreate为true，则初始化
+      // 如果不是初始化，且为this.value为空，则重置表单
       if (!this.formCreate && this.validatenull(this.value)) {
         this.resetForm();
       } else {
@@ -463,7 +489,7 @@ export default {
       }
     },
     clearValidate() {
-      this.Form.clearValidate();
+      this.$refs[this.formRef].clearValidate();
     },
     /**
      * 清空表单字段
@@ -484,25 +510,35 @@ export default {
         this.model = this.deepClone(this.modelDefault.tableForm);
       }
 
+      // 重置表单初始化状态，否则如果 this.value为空
+      // watch value -> formVal -> resetForm -> watch value -> ...死循环
+      this.formCreate = true;
       // 重置modelTranslate
       this.modelTranslate = {};
       this.forEachLabel();
 
       // 触发input方法，修改外部model
       this.$emit("input", this.model);
-      this.$emit("reset-change");
+      this.$emit("reset-change", this.model);
 
       // 清除表单验证
       this.$nextTick(() => {
         this.clearValidate();
       });
     },
+    //对部分表单字段进行校验的方法
+    validateField(val) {
+      return this.$refs.form.validateField(val);
+    },
     validate(callback) {
       if (!callback) {
         return new Promise((resolve, reject) => {
-          this.Form.validate(valid => {
+          this.$refs[this.formRef].validate(valid => {
             if (valid) {
-              resolve(valid);
+              // 校验dynamic
+              this.validateDynamic().then(res => {
+                resolve(valid);
+              })
             } else {
               this.$message.warning("表单未填写完整，请检查后再提交");
               reject(valid);
@@ -510,13 +546,24 @@ export default {
           });
         });
       } else {
-        this.Form.validate(valid => {
+        this.$refs[this.formRef].validate(valid => {
           if (!valid) {
             this.$message.warning("表单未填写完整，请检查后再提交");
           }
-          callback(valid);
+          // 校验dynamic
+          this.validateDynamic().then(res => {
+            callback(valid);
+          })
         });
       }
+    },
+    validateDynamic() {
+      let validateArr = [];
+      for (let index = 0; index < this.dynamicOption.length; index++) {
+        const curDynamic = this.dynamicOption[index];
+        validateArr.push(this.getRefByProp(curDynamic.prop).$refs.temp.validate());
+      }
+      return Promise.all(validateArr);
     },
     submit() {
       this.validate(valid => {
@@ -528,7 +575,7 @@ export default {
               this.model,
               this.modelTranslate,
               this.parentOption.translate,
-              this.noModelFileds
+              this.noModelFields
             ),
             this.hide
           );
@@ -560,39 +607,32 @@ export default {
     // get
     // 获取表单验证后的整个model
     getFormModel(cb) {
-      if (cb) {
+      return new Promise((resolve, reject) => {
         this.validate(valid => {
           if (valid) {
-            cb(
+            if (typeof cb === 'function') {
+              cb(
+                filterDefaultParams(
+                  this.model,
+                  this.modelTranslate,
+                  this.parentOption.translate,
+                  this.noModelFields
+                )
+              );
+            }
+            resolve(
               filterDefaultParams(
                 this.model,
                 this.modelTranslate,
                 this.parentOption.translate,
-                this.noModelFileds
+                this.noModelFields
               )
             );
           } else {
             console.error("验证失败，请检查表单");
           }
         });
-      } else {
-        return new Promise((resolve, reject) => {
-          this.validate(valid => {
-            if (valid) {
-              resolve(
-                filterDefaultParams(
-                  this.model,
-                  this.modelTranslate,
-                  this.parentOption.translate,
-                  this.noModelFileds
-                )
-              );
-            } else {
-              console.error("验证失败，请检查表单");
-            }
-          });
-        });
-      }
+      });
     },
     getGroupByProp(prop) {
       let groups = this.options.group;
@@ -603,9 +643,15 @@ export default {
         }
       }
       return -1;
+    },
+    getRefByProp(prop) {
+      return this.$refs[prop][0];
     }
   },
   computed: {
+    isMenu() {
+      return this.columnOption.length != 1
+    },
     parentOption() {
       let option = this.deepClone(this.tableOption);
 
@@ -629,7 +675,6 @@ export default {
       list.forEach((ele, index) => {
         // 循环列的全部属性
         (ele.forms || []).forEach((form, cindex) => {
-          if (form.noModel) this.noModelFileds.push(form.prop);
           //动态计算列的位置，如果为隐藏状态则或则手机状态不计算
           if (form.hide !== true && form.display !== false && !this.isMobile) {
             // 如果该项没有设置span，且设置了itemSpan，则赋值itemSpan
@@ -638,6 +683,10 @@ export default {
             }
             form = calcCount(form, this.itemSpanDefault, cindex === 0);
           }
+
+          // 特殊字段处理
+          // noModel处理
+          if (form.noModel) this.noModelFields.push(form.prop);
         });
         //处理级联属性
         // ele.forms = calcCascader(ele.forms);
@@ -653,6 +702,15 @@ export default {
       });
       return list;
     },
+    dynamicOption() {
+      let list = []
+      this.propOption.forEach(ele => {
+        if (ele.type == 'dynamic' && this.vaildDisplay(ele)) {
+          list.push(ele)
+        }
+      })
+      return list
+    },
     menuPosition() {
       if (this.parentOption.menuPosition) {
         return this.parentOption.menuPosition;
@@ -661,9 +719,6 @@ export default {
     },
     optionsDisabled() {
       return this.options.disabled;
-    },
-    Form() {
-      return this.$refs[this.formRef];
     },
     textMode() {
       return this.options.textMode;
@@ -800,9 +855,10 @@ export default {
   // el-card
   .el-card {
     border: 0;
-  }
-  .el-card__header {
-    padding: 0;
+    .el-card__header {
+      padding: 0;
+      margin-bottom: 20px;
+    }
   }
   .clearfix:before,
   .clearfix:after {
@@ -816,11 +872,18 @@ export default {
   .el-collapse-item__content {
     padding-bottom: 0;
   }
+  // 空label没有margin-left
+  .zvue-form-item_emptylabel > .el-form-item__content {
+    margin-left: 0 !important;
+  }
 }
 // 下拉树的样式调整
 .zvue-input-tree {
   .el-tree-node__content {
     padding: 0;
+    span {
+      font-weight: normal !important;
+    }
   }
 }
 </style>

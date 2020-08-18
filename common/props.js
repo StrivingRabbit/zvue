@@ -106,7 +106,7 @@ export default function (type) {
                     default: 'text'
                 },
                 label: {
-                    type: String,
+                    type: [String, Boolean],
                     default: ''
                 },
                 min: {

@@ -4,6 +4,7 @@ export default {
     paginationSlotName: "tablePagination",
     editBtn: false,
     calcelBtn: true,
+    border: false,
     rowStyle: { height: '50px' },
     cellStyle: { padding: '0px' },
     headerCellStyle: { padding: '0px', height: '50px' },
@@ -12,10 +13,14 @@ export default {
     align: 'left',
     headerAlign: 'left',
     customTopPosition: 'right',
-    indexLabel: "序号",
     expandWidth: 60,
     expandFixed: 'left',
+    indexLabel: "序号",
     sumText: '合 计',
+    saveBtnText: '保 存',
+    editBtnText: '编 辑',
+    cancelBtnText: '取 消',
+    searchShow: true,
     // 默认log
     LOG: {
         error: {

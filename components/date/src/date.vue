@@ -131,7 +131,7 @@ export default {
       handler(val) {
         this.handleChange(val);
       },
-      deep: true,
+      deep: true
     }
   },
   created() {

@@ -2,9 +2,6 @@
   <el-input-number
     v-model="text"
     class="z-input-number"
-    @click.native="handleClick"
-    @focus="handleFocus"
-    @blur="handleBlur"
     :precision="precision"
     :size="size"
     :min="minRows"
@@ -14,11 +11,13 @@
     :controls-position="controlsPosition"
     :label="placeholder"
     :disabled="disabled"
+    @click.native="handleClick"
+    @focus="handleFocus"
+    @blur="handleBlur"
   ></el-input-number>
 </template>
 
 <script>
-
 import props from "../../../common/props";
 import events from "../../../common/events";
 export default {
@@ -51,14 +50,13 @@ export default {
   },
   watch: {
     text: {
-      handler() {
-        this.handleChange(this.text);
-      },
-      immediate: true
+      handler(val) {
+        this.handleChange(val);
+      }
     }
   },
-  created() {},
-  mounted() {},
+  created() { },
+  mounted() { },
   methods: {}
 };
 </script>

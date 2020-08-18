@@ -1,9 +1,9 @@
 import Table from './components/table'
 import Pagination from './components/table/pagination'
-import Dropdown from './components/table/dropdown'
+import Dropdown from './components/table/dropDown'
 
 import Form from './components/form'
-import Cascader from './components/Cascader';
+import Cascader from './components/cascader';
 import Checkbox from './components/checkbox';
 import Date from './components/date';
 import Group from './components/group';
@@ -19,6 +19,7 @@ import Time from './components/time';
 import Tree from './components/tree';
 import Upload from './components/upload';
 import Dynamic from './components/dynamic';
+import Dialog from './components/dialog';
 
 import VeLine from 'v-charts/lib/line.common' //折线图
 import VeBar from 'v-charts/lib/bar.common' //条形图
@@ -31,6 +32,7 @@ import vcharts from './components/vcharts'
 // directive
 import Clickout from "./directive/clickout"
 import Appendtobody from "./directive/appendtobody"
+import DialogDrag from "./directive/dialogDrag"
 
 // functions
 import { deepClone, vaildData, findArray, setPx, _typeOf, getValueByPath, getPropByPath } from './utils/util';
@@ -40,6 +42,7 @@ const components = [
     Dropdown,
     Pagination,
     Dynamic,
+    Dialog,
     Table,
     Cascader,
     Checkbox,
@@ -68,6 +71,7 @@ const components = [
 const install = (Vue) => {
     Clickout(Vue);
     Appendtobody(Vue);
+    DialogDrag(Vue);
     components.forEach(component => {
         if (component.install) {
             component.install(Vue);

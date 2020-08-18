@@ -1,8 +1,13 @@
 <template>
   <div>
-    <z-table ref="crud" :options="options">
+    <z-table
+      ref="crud"
+      :options="options"
+      @cell-mouse-enter="cellMouseEnter"
+      @cell-mouse-leave="cellMouseLeave"
+    >
       <!-- <template slot="indexHeader">
-        <span v-if="addBtn">序号</span>
+        <span v-if="noAddBtn">序号</span>
         <el-button
           v-else
           type="primary"
@@ -15,8 +20,7 @@
       </template>-->
       <template #index="{scopeRow:scope}">
         <el-button
-          v-if="delBtn && hoverList[scope.row.$index] && !disabled"
-          @mouseout.native="mouseoutRow(scope.row.$index)"
+          v-if="!noDelBtn && hoverList[scope.row.$index] && !disabled"
           @click="delRow(scope.row.$index)"
           type="danger"
           size="mini"
@@ -24,10 +28,7 @@
           icon="el-icon-delete"
           circle
         ></el-button>
-        <span
-          v-else-if="!delBtn || !hoverList[scope.row.$index]"
-          @mouseover="mouseoverRow(scope.row.$index)"
-        >{{scope.row.$index+1}}</span>
+        <span v-else-if="noDelBtn || !hoverList[scope.row.$index]">{{scope.row.$index+1}}</span>
       </template>
     </z-table>
   </div>
@@ -38,10 +39,12 @@
 import props from "../../../common/props";
 import events from "../../../common/events";
 import { deepClone, vaildBoolean } from "../../../utils/util";
+import { asyncValidator } from '../../../utils/validate';
 
 export default {
   name: "zDynamic",
   mixins: [props(), events()],
+  inject: ['formSafe'],
   data() {
     return {
       hoverList: []
@@ -68,11 +71,13 @@ export default {
     viewBtn() {
       return this.children.viewBtn === false;
     },
-    delBtn() {
-      return !this.textMode || this.children.delBtn === true;
+    noDelBtn() {
+      if (this.textMode) return this.textMode;
+      return this.children.delBtn === false;
     },
-    addBtn() {
-      return !this.textMode || this.children.addBtn === true;
+    noAddBtn() {
+      if (this.textMode) return this.textMode;
+      return this.children.addBtn === false;
     },
     columnOption() {
       return this.children.columnConfig || [];
@@ -108,7 +113,7 @@ export default {
               // 如果使用headerSlot，会有省略号
               // 使用headerSlot，disabled不能更新
               renderHeader: (h, { column, $index }) => {
-                if (!this.addBtn) {
+                if (this.noAddBtn) {
                   return "序号";
                 }
                 return h("el-button", {
@@ -139,7 +144,7 @@ export default {
             list.push(
               Object.assign(this.deepClone(ele), {
                 size: ele.size || this.size,
-                textMode: vaildBoolean(this.textMode, ele.textMode),
+                textMode: vaildBoolean(ele.textMode, this.textMode),
                 cell: true,
                 disabled: ele.disabled || this.disabled || this.viewBtn
               })
@@ -172,12 +177,12 @@ export default {
       this.handleChange(this.text);
     },
     mouseoverRow(index) {
-      if (!this.delBtn) return;
+      if (this.noDelBtn || this.disabled) return;
       this.flagList();
       this.$set(this.hoverList, index, true);
     },
     mouseoutRow(index) {
-      if (!this.delBtn) return;
+      if (this.noDelBtn) return;
       this.flagList();
       this.$set(this.hoverList, index, false);
     },
@@ -206,6 +211,21 @@ export default {
       } else {
         callback();
       }
+    },
+    validate() {
+      let validateArrs = [];
+      for (let index = 0; index < this.text.length; index++) {
+        const curRow = this.text[index];
+        // validateArrs.push(asyncValidator(this.formRules, curRow));
+        validateArrs.push(this.$refs.crud.rowCellUpdate(curRow, index));
+      }
+      return Promise.all(validateArrs);
+    },
+    cellMouseEnter(row) {
+      this.mouseoverRow(row.$index);
+    },
+    cellMouseLeave(row) {
+      this.mouseoutRow(row.$index);
     }
   }
 };

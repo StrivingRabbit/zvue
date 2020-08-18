@@ -6,8 +6,8 @@ import moment from 'moment';
 
 export const detail = (row = {}, column = {}, option = {}, dic = []) => {
   let result = getValueByPath(row, column.prop || column.value);
-  let type = column.type;
-  if (validatenull(type)) return result;
+  let type = column.type || 'input';
+  // if (validatenull(type)) return result;
   if (validatenull(result)) {
     result = '';
     return result;
