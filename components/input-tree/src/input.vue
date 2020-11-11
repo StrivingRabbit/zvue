@@ -215,19 +215,23 @@ export default {
       if (!value) return true;
       return data[this.labelKey].indexOf(value) !== -1;
     },
-    checkChange(checkedNodes, checkedKeys, halfCheckedNodes, halfCheckedKeys) {
+    checkChange(checkedNodes, { checkedKeys, halfCheckedKeys, halfCheckedNodes }) {
       this.text = [];
       this.node = [];
       this.labelText = [];
       const list = this.$refs.tree.getCheckedNodes();
-      list.forEach(node => {
+      for (let index = 0; index < list.length; index++) {
+        const node = list[index];
+        // 不保存显示父级，只保存选中自己id
+        if (this.showAllLevels === false && !this.validatenull(node[this.childrenKey])) continue;
         this.node.push(node)
         this.text.push(node[this.valueKey]);
         this.labelText.push(node[this.labelKey]);
-      });
+      }
       if (typeof this.checked === "function") this.checked(checkedNodes);
-      const result =
-        this.isString && this.multiple ? this.text.join(",") : this.text;
+      const result = this.isString && this.multiple
+        ? this.text.join(",")
+        : this.text;
       this.$emit("input", result);
       this.$emit("change", result);
     },
@@ -237,10 +241,13 @@ export default {
         this.node = [];
         if (this.multiple) {
           let list = this.$refs.tree.getCheckedNodes(this.leafOnly, this.includeHalfChecked)
-          list.forEach(ele => {
+          for (let index = 0; index < list.length; index++) {
+            const ele = list[index];
+            // 不保存显示父级，只保存选中自己id
+            if (this.showAllLevels === false && !this.validatenull(ele[this.childrenKey])) continue;
             this.labelText.push(ele[this.labelKey])
             this.node.push(ele);
-          })
+          }
         } else {
           let node = this.$refs.tree.getNode(this.text)
           if (node) {

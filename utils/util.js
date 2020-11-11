@@ -71,7 +71,7 @@ export const miAjax = ({ axios = window.$axios || AXIOS, url, method = 'get', qu
 export const getPasswordChar = (result = '', char) => {
     return result;
 };
-export const findByValue = (dic, value, props, isTree, isCascader, isGroup, dataType) => {
+export const findByValue = (dic, value, props, isTree, isCascader, isGroup, dataType, column) => {
     // 如果为空直接返回
     if (validatenull(dic)) return value;
     let result = '';
@@ -81,7 +81,14 @@ export const findByValue = (dic, value, props, isTree, isCascader, isGroup, data
         // 如果是级联，则传递整个数组为值
         if (isCascader) {
             // 由于项目的级联中，同深度的树的id可能会重复，因此改为从根部匹配id，如果匹配到再向下查找
-            result = findLabelNode(dic, value, props, dataType, isCascader) || value;
+            if (column.multiple) {
+                value.forEach(currentValue => {
+                    let res = findLabelNode(dic, currentValue, props, dataType, isCascader);
+                    result.push(_typeOf(res) === 'Array' ? res.join('/') : '');
+                });
+            } else {
+                result = findLabelNode(dic, value, props, dataType, isCascader) || value;
+            }
         } else {
             // 否则，一层层去查找
             for (let i = 0; i < value.length; i++) {
@@ -212,7 +219,7 @@ export const setPx = (val, defval = '') => {
     if (validatenull(val)) val = defval;
     if (validatenull(val)) return '';
     val = val + '';
-    if (val.indexOf('%') === -1) {
+    if (val.indexOf('%') === -1 && val.indexOf('px') === -1) {
         val = val + 'px';
     }
     return val;

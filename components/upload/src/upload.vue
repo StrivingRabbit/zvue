@@ -38,7 +38,7 @@
       <template v-else>
         <el-button size="small" type="primary">{{buttonText}}</el-button>
       </template>
-      <div v-if="!onlyButton" slot="tip" class="el-upload__tip">{{tip}}</div>
+      <div v-if="!onlyButton" slot="tip" class="el-upload__tip" style="color:#999;">{{tip}}</div>
     </el-upload>
     <el-dialog append-to-body :modal-append-to-body="false" :visible.sync="dialogVisible">
       <div class="avue-dialog">

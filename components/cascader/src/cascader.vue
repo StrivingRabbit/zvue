@@ -151,6 +151,12 @@ export default {
     }
   },
   watch: {
+    props(newVal) {
+      typeof newVal.multiple === 'undefined' ? newVal.multiple = this.multiple : '';
+    },
+    multiple(newVal, oldVal) {
+      this.props.multiple = newVal;
+    },
     text: {
       // immediate: true,
       handler(value) {

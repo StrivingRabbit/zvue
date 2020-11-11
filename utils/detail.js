@@ -92,7 +92,8 @@ export const detail = (row = {}, column = {}, option = {}, dic = []) => {
       ['tree'].includes(column.type),
       isCascader,
       column.group,
-      column.dataType
+      column.dataType,
+      column
     );
     return result;
   }

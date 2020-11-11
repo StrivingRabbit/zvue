@@ -34,6 +34,7 @@ import { DIC_SPLIT, DIC_HTTP_PROPS } from "../../../global/variable";
 // 需要自定义multiple
 let mixinProps = props();
 delete mixinProps.props.multiple;
+const MinWidth = 500;
 
 export default {
   name: "zInputTable",
@@ -315,7 +316,7 @@ export default {
     },
     popoverWidth() {
       let inputWidth = this.$parent.$el.getBoundingClientRect().width;
-      this.width = inputWidth < 400 ? 400 : inputWidth;
+      this.width = inputWidth < MinWidth ? MinWidth : inputWidth;
     },
     searchChange(model, done) {
       this.onList(undefined, model).finally(() => {

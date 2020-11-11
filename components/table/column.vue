@@ -50,7 +50,7 @@
             v-else-if="cellEditFlag(scopeRow.row,col)"
             :value="getValueByPath(scopeRow.row, col.prop)"
             :isCrud="true"
-            :column="col"
+            :column="delete col.width ? col : col"
             :size="controlSize"
             :dic="DIC[col.prop]"
             :upload-before="col.uploadBefore"
@@ -83,7 +83,7 @@
                 disabled
               />
             </span>
-            <span :style="{display:'flex'}" v-else-if="['img'].includes(col.type)">
+            <span v-else-if="['img'].includes(col.type)">
               <z-img
                 :value="getValueByPath(scopeRow.row, col.prop)"
                 :load="col.load"

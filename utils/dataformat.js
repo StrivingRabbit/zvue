@@ -1,6 +1,6 @@
 import { KEY_COMPONENT_NAME } from '../global/variable'
 import { validatenull } from './validate'
-import { detailDataType, setValueByPath } from './util';
+import { detailDataType, setValueByPath, _typeOf } from './util';
 
 const dateList = [
     'dates',
@@ -224,8 +224,16 @@ export const formInitVal = (list = []) => {
             ele.dataType === 'number'
         ) {
             currentValue = undefined;
-        } else if (['switch'].includes(ele.type) || ele.dataType === 'boolean') {
-            currentValue = false;
+        } else if (['switch'].includes(ele.type)) {
+            if (ele.dataType === 'boolean') {
+                currentValue = false;
+            } else if (_typeOf(ele.dicData) === 'Array') {
+                let valueKey = 'value';
+                if (typeof ele.props !== 'undefined' && ele.props.value !== 'undefined') {
+                    valueKey = ele.props.value;
+                }
+                currentValue = ele.dicData[0][valueKey];
+            }
         } else {
             currentValue = '';
         }

@@ -1,14 +1,17 @@
 <template>
-  <div class="zvue-table-wrapper" :style="{height:wrapperHeight,width:setPx(tableOption.width)}">
+  <div
+    class="zvue-table-wrapper"
+    :style="{ height: wrapperHeight, width: setPx(tableOption.width) }"
+  >
     <header-search :search="search" ref="headerSearch">
-      <template slot="search" slot-scope="{size,row}">
+      <template slot="search" slot-scope="{ size, row }">
         <slot name="search" :row="row" :size="size"></slot>
       </template>
-      <template slot="searchMenu" slot-scope="{size,row}">
+      <template slot="searchMenu" slot-scope="{ size, row }">
         <slot name="searchMenu" :row="row" :size="size"></slot>
       </template>
       <template
-        slot-scope="{value,column,dic,size,label,disabled}"
+        slot-scope="{ value, column, dic, size, label, disabled }"
         v-for="item in columnFormOption"
         :slot="item.prop"
       >
@@ -20,27 +23,69 @@
           :label="label"
           :disabled="disabled"
           :row="search"
-          :name="item.prop+'Search'"
+          :name="item.prop + 'Search'"
           v-if="item.searchslot"
         ></slot>
       </template>
     </header-search>
+    <!-- v-if="uiConfig.multiSelection || options.customTop || $scopedSlots['custom-top']" -->
     <div
-      v-if="options.customTop || $scopedSlots['custom-top']"
+      v-if="
+        uiConfig.multiSelection ||
+        options.customTop ||
+        $scopedSlots['custom-top']
+      "
+      style="
+        display: flex;
+        justify-content: space-between;
+        flex-direction: row-reverse;
+        margin-bottom: 20px;
+      "
       ref="customTop"
-      :style="{textAlign:options.customTopPosition || config.customTopPosition,height:'auto',padding:'0 20px 20px'}"
     >
-      <slot
-        :name="config.topSlotName"
-        :size="controlSize"
-        :columnConfig="columnConfig"
-        :allData="allData"
-        :tableShowData="tableShowData"
-        :selectedData="selectedData"
-        :currentRowData="currentRowData"
-        :lastCurrentRowData="lastCurrentRowData"
-        :allSelectedData="allSelectedData"
-      ></slot>
+      <div
+        v-if="options.customTop || $scopedSlots['custom-top']"
+        :style="{
+          textAlign: options.customTopPosition || config.customTopPosition,
+          height: 'auto',
+          margin: '0 20px',
+        }"
+      >
+        <slot
+          :name="config.topSlotName"
+          :size="controlSize"
+          :columnConfig="columnConfig"
+          :allData="allData"
+          :tableShowData="tableShowData"
+          :selectedData="selectedData"
+          :currentRowData="currentRowData"
+          :lastCurrentRowData="lastCurrentRowData"
+          :allSelectedData="allSelectedData"
+        ></slot>
+      </div>
+      <!-- 跨页多选 -->
+      <el-tooltip
+        v-if="uiConfig.multiSelection"
+        :content="
+          allSelectedData.length
+            ? `分别为${allSelectedDataPages}页`
+            : '暂无数据'
+        "
+        placement="top"
+        style="margin: 0 20px"
+      >
+        <el-tag type="primary">
+          跨页多选：{{ allSelectedData.length }}条
+          <el-link
+            style="vertical-align: top"
+            type="danger"
+            :underline="false"
+            @click="_emptyAllSelectedData"
+            v-if="!!allSelectedData.length"
+            >清空</el-link
+          >
+        </el-tag>
+      </el-tooltip>
     </div>
     <div v-loading="loading" class="zvue-table-body">
       <el-table
@@ -53,13 +98,20 @@
         :cell-class-name="cellClassName"
         :row-key="rowKey"
         :lazy="tableOption.lazy"
-        :tree-props="tableOption.treeProps || {children: 'children', hasChildren: 'hasChildren'}"
+        :tree-props="
+          tableOption.treeProps || {
+            children: 'children',
+            hasChildren: 'hasChildren',
+          }
+        "
         :load="_treeLoad"
         :expand-row-keys="expandList"
         :default-expand-all="tableOption.defaultExpandAll"
         :row-style="tableOption.rowStyle || config.rowStyle"
         :cell-style="tableOption.cellStyle || config.cellStyle"
-        :header-cell-style="tableOption.headerCellStyle || config.headerCellStyle"
+        :header-cell-style="
+          tableOption.headerCellStyle || config.headerCellStyle
+        "
         :key="key"
         :data="tableShowData"
         :height="tableHeight"
@@ -85,9 +137,9 @@
           align="center"
           v-if="tableOption.expand"
           :width="tableOption.expandWidth || config.expandWidth"
-          :fixed="vaildData(tableOption.expandFixed,config.expandFixed)"
+          :fixed="vaildData(tableOption.expandFixed, config.expandFixed)"
         >
-          <template #default="{row,index}">
+          <template #default="{ row, index }">
             <slot :row="row" :index="index" name="expand"></slot>
           </template>
         </el-table-column>
@@ -111,20 +163,47 @@
           :width="uiConfig.showIndex.width || config.indexWidth"
           :align="uiConfig.showIndex.align || 'center'"
         >
-          <template slot="header">{{uiConfig.showIndex.label || config.indexLabel}}</template>
+          <template slot="header">{{
+            uiConfig.showIndex.label || config.indexLabel
+          }}</template>
         </el-table-column>
 
         <!-- 解决使用column组件多选索引顺序错位 -->
         <el-table-column width="1px"></el-table-column>
         <column :columnConfig="columnConfig">
-          <template v-for="col in columnConfig" slot-scope="{column}" :slot="`${col.prop}Header`">
+          <template
+            v-for="col in columnConfig"
+            slot-scope="{ column }"
+            :slot="`${col.prop}Header`"
+          >
             <slot :name="`${col.prop}Header`" :column="column"></slot>
           </template>
           <template
             v-for="col in columnConfig"
-            #[col.prop]="{scopeRow,label,row,size,column,disabled,isEdit,dic}"
+            #[col.prop]="{
+              scopeRow,
+              label,
+              row,
+              size,
+              column,
+              disabled,
+              isEdit,
+              dic,
+            }"
           >
-            <slot :name="col.prop" v-bind="{scopeRow,label,row,size,column,disabled,isEdit,dic}"></slot>
+            <slot
+              :name="col.prop"
+              v-bind="{
+                scopeRow,
+                label,
+                row,
+                size,
+                column,
+                disabled,
+                isEdit,
+                dic,
+              }"
+            ></slot>
           </template>
         </column>
 
@@ -136,40 +215,53 @@
           :prop="btnConfig.prop"
           :label="btnConfig.label"
           :width="btnConfig.width"
-          :align="btnConfig.align || options.align || 'center'"
-          :header-align="btnConfig.headerAlign || 'center'"
+          :align="btnConfig.align || parentOption.align || 'center'"
+          :header-align="
+            btnConfig.headerAlign || parentOption.headerAlign || 'center'
+          "
         >
           <!-- 搜索框 -->
           <template v-if="uiConfig.searchable" slot="header">
-            <el-input v-model="searchVal" :size="controlSize" placeholder="检索" />
+            <el-input
+              v-model="searchVal"
+              :size="controlSize"
+              placeholder="检索"
+            />
           </template>
           <!-- 按钮 -->
-          <template #default="{row,$index,column}">
+          <template #default="{ row, $index, column }">
             <!-- 编辑按钮 -->
             <el-button
               type="text"
               :size="controlSize"
               :disabled="row.$btnDisabled"
-              @click.stop="rowCell(row,$index)"
-              v-if="vaildBoolean(tableOption.editBtn,config.editBtn)"
-            >{{_editBtnText(row)}}</el-button>
+              @click.stop="rowCell(row, $index)"
+              v-if="vaildBoolean(tableOption.editBtn, config.editBtn)"
+              >{{ _editBtnText(row) }}</el-button
+            >
             <!-- 取消按钮 -->
             <el-button
-              v-if="row.$cellEdit && vaildBoolean(tableOption.calcelBtn,config.calcelBtn)"
+              v-if="
+                row.$cellEdit &&
+                vaildBoolean(tableOption.calcelBtn, config.calcelBtn)
+              "
               type="text"
               :size="controlSize"
               :disabled="row.$btnDisabled"
-              @click.stop="rowCanel(row,$index)"
-            >{{parentOption.cancelBtnText || config.cancelBtnText}}</el-button>
+              @click.stop="rowCanel(row, $index)"
+              >{{
+                parentOption.cancelBtnText || config.cancelBtnText
+              }}</el-button
+            >
             <!-- 操作列的slot -->
             <slot
-              v-if="vaildData(tableOption.operation,!!$scopedSlots.operation)"
+              v-if="vaildData(tableOption.operation, !!$scopedSlots.operation)"
               :name="config.operationSlotName"
-              :scopeRow="{row,$index,column}"
+              :scopeRow="{ row, $index, column }"
               :row="row"
               :column="column"
               :index="$index"
-              :isEdit="vaildBoolean(row.$cellEdit,false)"
+              :isEdit="vaildBoolean(row.$cellEdit, false)"
               :disabled="row.$btnDisabled"
               :size="controlSize"
             ></slot>
@@ -181,10 +273,10 @@
                 :size="btn.size || controlSize"
                 type="text"
                 :key="btn.label"
-                @click.stop="btn.handler({row,$index,column})"
+                @click.stop="btn.handler({ row, $index, column })"
               >
                 <i v-if="btn.icon" :class="btn.icon"></i>
-                {{btn.label}}
+                {{ btn.label }}
               </el-button>
               <!-- 带下拉按钮，参数为scopeRow -->
               <z-dropdown
@@ -192,8 +284,8 @@
                 :size="btn.size || controlSize"
                 :key="btn.label"
                 :dropDown="btn"
-                :carryData="{row,$index,column}"
-                :style="{display:'inline-block'}"
+                :carryData="{ row, $index, column }"
+                :style="{ display: 'inline-block' }"
               />
             </template>
           </template>
@@ -241,16 +333,20 @@ import {
   vaildData,
   vaildBoolean,
   setDefaultValue,
-  setPx
+  setPx,
+  getPropByPath
 } from "../../../utils/util";
 import { detail } from "../../../utils/detail";
 import { DIC_SPLIT, EMPTY_VALUE } from "../../../global/variable";
 
 import headerSearch from '../header-search';
 
-//单双击冲突timer
+// 单双击冲突timer
 let dblclickTimer = null;
 let paginationTimer = null;
+
+// 多选数组
+let multiSelectionArray = [];
 
 //点击事件屏蔽列
 let preventClick = ["selection", "operation", "img"];
@@ -479,8 +575,8 @@ export default {
           data: data
         })
           .then(res => {
-            this._setTableData(res[this.listKey]);
-            this.setTotal(res[this.totalKey]);
+            this._setTableData(getPropByPath(res, this.listKey).v);
+            this.setTotal(getPropByPath(res, this.totalKey).v);
             resolve(res);
           })
           .catch(err => {
@@ -509,8 +605,11 @@ export default {
     },
     // 计算高度
     _computedLayoutHeight() {
-      // 如果是 auto 或者 没有配置pagination 则根据内容自适应
-      if (this.uiConfig.height === "auto" || this.uiConfig.pagination === false) return;
+      // 如果是 auto 或者 没有配置height 且 pagination为false 则根据内容自适应
+      if (
+        this.uiConfig.height === "auto" ||
+        (!this.uiConfig.height && this.uiConfig.pagination === false)
+      ) return;
 
       // 拿到设置高度
       let _height = this.uiConfig.height
@@ -553,6 +652,14 @@ export default {
       );
     },
     _setTableData(data) {
+      // 如果开启修改模式，则data默认开启修改
+      if (this.options.edit === true) {
+        data = data.map(item => ({
+          ...item,
+          $cellEdit: true
+        }))
+      }
+
       if (!(data instanceof Array)) return;
       if (this.isServerMode) {
         this.tableShowData = data;
@@ -834,6 +941,11 @@ export default {
 
       this.clearSelection();
     },
+    _emptyAllSelectedData() {
+      multiSelectionArray = [];
+      this.prevSelectedData = multiSelectionArray;
+      this.clearSelection();
+    },
 
     /**
      * table触发方法
@@ -994,6 +1106,8 @@ export default {
         this.tableMethods.select(selection, row, this);
       }
 
+      this._setMultiSelection(selection);
+
       this.$emit("select", selection, row, this);
     },
     // 当勾选全选checkbox时触发
@@ -1001,6 +1115,8 @@ export default {
       if (this.tableMethods.selectAll) {
         this.tableMethods.selectAll(selection, this);
       }
+
+      this._setMultiSelection(selection);
 
       this.$emit("select-all", selection, this);
     },
@@ -1031,6 +1147,15 @@ export default {
     clearFilter(columnKey) {
       this.$refs.dataBaseTable.clearFilter(columnKey);
     },
+    _setMultiSelection(selection) {
+      // 是否跨页多选
+      if (this.uiConfig.multiSelection) {
+        multiSelectionArray[this.currentPage] = deepClone(selection);
+        // 将当前页选中数据缓存
+        this.prevSelectedData = [].concat(multiSelectionArray);
+        // this.prevSelectedData[this.currentPage] = selection;
+      }
+    },
 
     /**
      * search form
@@ -1054,20 +1179,6 @@ export default {
     },
     // 表格全部选中数据
     getAllSelectedData() {
-      /* if (!this.prevSelectedData.length) {
-        return this.selectedData;
-      } else {
-        return this.prevSelectedData.reduce(
-          (prev, cur, curIndex) => {
-            if (curIndex === this.currentPage) {
-              prev = prev.concat(this.selectedData)
-            } else {
-              this._typeOf(cur) === 'Array' ? prev = prev.concat(cur) : prev
-            }
-            return prev;
-          }, []
-        );
-      } */
       return this.allSelectedData;
     },
     //set
@@ -1156,7 +1267,7 @@ export default {
       let returnConfig = this.config.defaultBtnConfig;
       // 如果有btnConfig，则将btnConfig和defaultBtnConfig合并
       if (this._typeOf(btnConfig) === "Object") {
-        returnConfig = setDefaultValue(btnConfig, this.config.defaultBtnConfig, this)
+        returnConfig = setDefaultValue(returnConfig, btnConfig, this)
       }
 
       // 如果有operation，则代表要使用slot的列操作，权重为最高
@@ -1254,25 +1365,17 @@ export default {
     // 此处反显时执行次数太多，后期如果有性能问题，改为方法获取
     allSelectedData() {
       // 是否跨页多选
-      if (this.uiConfig.multiSelection) {
-        let res = [];
-        if (!this.prevSelectedData.length) {
-          res = this.selectedData;
-        } else {
-          return this.prevSelectedData.reduce(
-            (prev, cur, curIndex) => {
-              if (curIndex === this.currentPage) {
-                prev = prev.concat(this.selectedData)
-              } else {
-                this._typeOf(cur) === 'Array' ? prev = prev.concat(cur) : prev
-              }
-              return prev;
-            }, res
-          );
-        }
-        return res;
-      }
-      return [];
+      let res = this.prevSelectedData.reduce((prev, cur, curIndex) => {
+        cur ? prev = prev.concat(cur) : '';
+        return prev;
+      }, []);
+      return res
+    },
+    allSelectedDataPages() {
+      return this.prevSelectedData
+        .map((item, index) => { if (item) return `${index}(${item.length})`; })
+        .filter(item => !!item)
+        .join(', ');
     }
   },
   watch: {
@@ -1317,12 +1420,6 @@ export default {
           paginationTimer = setTimeout(() => {
             // 触发pagination方法
             this.$emit("handle-pagination", newVal.pageSize, newVal.currentPage, this);
-
-            // 是否跨页多选
-            if (this.uiConfig.multiSelection) {
-              // 将当前页选中数据缓存
-              this.prevSelectedData[oldVal.currentPage] = this.selectedData;
-            }
 
             // 如果有handler，则拦截分页方法。为了兼容服务端自己写请求数据方法
             if (this.uiConfig.pagination.handler) {
@@ -1461,6 +1558,9 @@ export default {
   }
   // 列操作兼容span间隔，否则span和button会紧贴着
   .zvue-table_operation {
+    .el-button + span {
+      margin-left: 10px;
+    }
     span + .el-button {
       margin-left: 10px;
     }

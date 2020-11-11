@@ -1,5 +1,5 @@
 <template>
-  <el-image :fit="fit" :src="imgSrc" :preview-src-list="previewSrcList" @load="loaded" @error="errored">
+  <el-image :style="{display:'flex'}" :fit="fit" :src="imgSrc" :preview-src-list="previewSrcList" @load="loaded" @error="errored">
     <template slot="placeholder">
       <!-- <slot name="placeholder" :scope="scope"></slot> -->
       <span class="dot">加载中...</span>
