@@ -4,16 +4,15 @@
     :style="{ height: wrapperHeight, width: setPx(tableOption.width) }"
   >
     <header-search :search="search" ref="headerSearch">
-      <template slot="search" slot-scope="{ size, row }">
+      <template #search="{ size, row }">
         <slot name="search" :row="row" :size="size"></slot>
       </template>
       <template slot="searchMenu" slot-scope="{ size, row }">
         <slot name="searchMenu" :row="row" :size="size"></slot>
       </template>
       <template
-        slot-scope="{ value, column, dic, size, label, disabled }"
+        #{item.prop}="{ value, column, dic, size, label, disabled }"
         v-for="item in columnFormOption"
-        :slot="item.prop"
       >
         <slot
           :value="value"
@@ -133,6 +132,7 @@
       >
         <!-- 折叠面板  -->
         <el-table-column
+          key="expand"
           type="expand"
           align="center"
           v-if="tableOption.expand"
@@ -147,6 +147,7 @@
         <!-- 多选 -->
         <el-table-column
           v-if="uiConfig.selection"
+          key="selection"
           fixed="left"
           type="selection"
           :width="config.selectionWidth"
@@ -157,6 +158,7 @@
         <!-- 索引 -->
         <el-table-column
           v-if="uiConfig.showIndex"
+          key="table_column_index"
           fixed="left"
           type="index"
           :index="uiConfig.showIndex.handler"
@@ -168,7 +170,7 @@
           }}</template>
         </el-table-column>
 
-        <!-- 解决使用column组件多选索引顺序错位 -->
+        <!-- 解决使用 column 组件多选索引顺序错位 -->
         <el-table-column width="1px"></el-table-column>
         <column :columnConfig="columnConfig">
           <template
@@ -210,6 +212,7 @@
         <!-- 列操作 -->
         <el-table-column
           v-if="btnConfig"
+          key="column_operation"
           class-name="zvue-table_operation"
           :fixed="btnConfig.fixed || 'right'"
           :prop="btnConfig.prop"
@@ -221,7 +224,7 @@
           "
         >
           <!-- 搜索框 -->
-          <template v-if="uiConfig.searchable" slot="header">
+          <template v-if="uiConfig.searchable" #header>
             <el-input
               v-model="searchVal"
               :size="controlSize"
@@ -237,8 +240,9 @@
               :disabled="row.$btnDisabled"
               @click.stop="rowCell(row, $index)"
               v-if="vaildBoolean(tableOption.editBtn, config.editBtn)"
-              >{{ _editBtnText(row) }}</el-button
             >
+              {{ _editBtnText(row) }}
+            </el-button>
             <!-- 取消按钮 -->
             <el-button
               v-if="
@@ -249,10 +253,11 @@
               :size="controlSize"
               :disabled="row.$btnDisabled"
               @click.stop="rowCanel(row, $index)"
-              >{{
-                parentOption.cancelBtnText || config.cancelBtnText
-              }}</el-button
             >
+              {{
+                parentOption.cancelBtnText || config.cancelBtnText
+              }}
+            </el-button>
             <!-- 操作列的slot -->
             <slot
               v-if="vaildData(tableOption.operation, !!$scopedSlots.operation)"
@@ -320,6 +325,7 @@
     </div>
   </div>
 </template>
+
 <script>
 import column from "../column";
 import config from "../../../global/config";
@@ -336,8 +342,7 @@ import {
   setPx,
   getPropByPath
 } from "../../../utils/util";
-import { detail } from "../../../utils/detail";
-import { DIC_SPLIT, EMPTY_VALUE } from "../../../global/variable";
+import { EMPTY_VALUE } from "../../../global/variable";
 
 import headerSearch from '../header-search';
 
@@ -446,10 +451,7 @@ export default {
     });
   },
   methods: {
-    deepClone,
     vaildData,
-    validatenull,
-    asyncValidator,
     vaildBoolean,
     setPx,
     $log(...args) {
@@ -645,7 +647,7 @@ export default {
       (this.isServerMode ? this.tableShowData : this.tableData).forEach(
         (ele, index) => {
           if (ele.$cellEdit) {
-            this.formCascaderList[index] = this.deepClone(ele);
+            this.formCascaderList[index] = deepClone(ele);
           }
           ele.$index = index;
         }
@@ -839,6 +841,7 @@ export default {
       }
     },
     rowCell(row, index) {
+      debugger
       if (row.$cellEdit) {
         this.rowCellUpdate(row, index);
       } else {
@@ -849,7 +852,7 @@ export default {
     rowCellAdd(obj = {}) {
       const len = this.tableShowData.length;
       this.tableShowData.push(
-        this.deepClone(
+        deepClone(
           Object.assign(
             {
               $cellEdit: true,
@@ -865,7 +868,7 @@ export default {
     //行取消
     rowCanel(row, index) {
       if (row.$cellEdit) {
-        if (this.validatenull(row[this.rowKey])) {
+        if (validatenull(row[this.rowKey])) {
           this.tableShowData.splice(index, 1);
           return;
         }
@@ -878,9 +881,9 @@ export default {
     },
     // 单元格编辑
     rowCellEdit(row, index) {
-      if (!(row.$cellEdit === true)) {
-        row.$cellEdit = true;
-        this.$set(this.tableShowData, index, row);
+      if (row.$cellEdit !== true) {
+        this.$set(row, '$cellEdit', true);
+        // this.$set(this.tableShowData, index, row);
         // 行编辑状态保存
         this.rowEditSaveCurStatus(row, index);
         // 编辑事件
@@ -890,7 +893,7 @@ export default {
     //单元格更新
     rowCellUpdate(row, index) {
       return new Promise((resolve, reject) => {
-        this.asyncValidator(this.formCellRules, row).then(res => {
+        asyncValidator(this.formCellRules, row).then(res => {
           this.$set(row, '$btnDisabled', true);
 
           // 返回参数
@@ -920,8 +923,8 @@ export default {
       })
     },
     rowEditSaveCurStatus(row, index) {
-      //缓冲行数据
-      this.formCascaderList[index] = this.deepClone(row);
+      //缓存行数据
+      this.formCascaderList[index] = deepClone(row);
       setTimeout(() => {
         this.formIndexList.push(index);
       }, 1000);
@@ -1336,7 +1339,7 @@ export default {
       return result;
     },
     isGroup() {
-      return !this.validatenull(this.tableOption.group);
+      return !validatenull(this.tableOption.group);
     },
     sumColumnList() {
       return this.tableOption.sumColumnList || [];
@@ -1467,6 +1470,7 @@ export default {
   }
 };
 </script>
+
 <style lang='less'>
 @headerBgc: #f4f6fc;
 @headerTextColor: #666;
