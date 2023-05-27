@@ -17,7 +17,7 @@
     :class="{'zvue-text-mode':(showDisplayValue && noTextMode)}"
     :is="getComponent(column.type,column.component)"
     :placeholder="getPlaceholder(column,column.type,comDisabled)"
-    v-model="text"
+    v-model="valueSync"
     :isCrud="isCrud"
     :dic="dic"
     :disabled="comDisabled"
@@ -115,25 +115,23 @@ export default {
   data() {
     return {
       first: true,
-      text: null,
+      valueSync: null,
       displayValue: '',
       EMPTY_VALUE
     };
   },
   watch: {
-    text: {
+    valueSync: {
       handler(val) {
         if (!this.first || !validatenull(val)) {
-          this.first = false;
           this.$emit("input", val);
-        } else {
-          this.first = false;
         }
+        this.first = false;
       }
     },
     value: {
       handler(val) {
-        this.text = val;
+        this.valueSync = val;
         // 设置displayValue值，用来显示详情
         this.$nextTick(() => {
           this.setDisplayValue();
@@ -198,7 +196,7 @@ export default {
       let displayValue = '';
       if (this.noDetailHandler && ![this.column.props || this.props].lazy) {
         let obj = {};
-        setValueByPath(obj, this.column.prop, this.text)
+        setValueByPath(obj, this.column.prop, this.valueSync)
         displayValue = detail(obj, this.column, this.column.props, this.dic);
 
         displayValue instanceof Array ? displayValue = displayValue.join(DIC_SPLIT) : '';

@@ -1,8 +1,8 @@
 import { validatenull } from './validate';
 import { getPasswordChar, findByValue, getValueByPath } from './util';
 import { dateTypeList } from './dataformat';
-// import dayjs from 'dayjs';
-import moment from 'moment';
+import dayjs from 'dayjs';
+// import moment from 'moment';
 
 export const detail = (row = {}, column = {}, option = {}, dic = []) => {
   let result = getValueByPath(row, column.prop || column.value);
@@ -59,7 +59,7 @@ export const detail = (row = {}, column = {}, option = {}, dic = []) => {
         let str = '';
 
         result.map((item, index) => {
-          str += moment(item).format(format);
+          str += dayjs(item).format(format);
           if (index !== len - 1) {
             str += (len === 2 ? splitStr : ' , ');
           }
@@ -67,7 +67,7 @@ export const detail = (row = {}, column = {}, option = {}, dic = []) => {
 
         result = str;
       } else {
-        result = moment(result).format(format);
+        result = dayjs(result).format(format);
       }
       return result;
     }

@@ -123,13 +123,10 @@ export default {
       switch (this.type) {
         case "textarea":
           return "textarea";
-          break;
         case "password":
           return "password";
-          break;
         default:
           return "text";
-          break;
       }
     }
   },

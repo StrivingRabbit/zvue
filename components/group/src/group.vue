@@ -67,9 +67,14 @@ export default {
   }
 };
 </script>
+
 <style lang="less">
 .z-group-arrow .el-collapse-item__arrow {
   display: none;
+}
+
+.z-group .el-collapse-item.is-disabled .el-collapse-item__header {
+  cursor: auto;
 }
 
 .z-group {
@@ -92,17 +97,17 @@ export default {
     color: rgba(0, 0, 0, 0.85);
   }
   .z-group_header {
-    width: 100%;
-    margin-bottom: 20px;
     display: flex;
+    width: 100%;
+    height: 50px;
+    line-height: 50px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
     -webkit-box-align: center;
     -ms-flex-align: center;
     align-items: center;
-    height: 50px;
-    line-height: 50px;
     -webkit-box-sizing: border-box;
     box-sizing: border-box;
-    border-bottom: 1px solid #eee;
   }
   .z-group_title {
     margin: 0;

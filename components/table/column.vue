@@ -27,7 +27,7 @@
         :filter-method="col.filter? _handleFiltersMethod : undefined"
         :filter-multiple="vaildBoolean(col.filterMultiple,true)"
       >
-        <template v-if="col.headerSlot" slot="header">
+        <template v-if="col.headerSlot" #header>
           <slot :name="`${col.prop}Header`" :column="col"></slot>
         </template>
         <template #default="scopeRow">
