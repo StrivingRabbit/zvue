@@ -3,7 +3,7 @@ pnpm i @lxh/zvue
 ```
 
 ```js
-import ZVue from '@lxh/zvue'
+import ZVue from '@liuxiaohang/zvue'
 Vue.use(ZVue)
 ```
 
