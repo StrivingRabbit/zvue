@@ -1,9 +1,9 @@
 ```sh
-pnpm i z-vue
+pnpm i @lxh/zvue
 ```
 
 ```js
-import ZVue from 'z-vue'
+import ZVue from '@lxh/zvue'
 Vue.use(ZVue)
 ```
 
