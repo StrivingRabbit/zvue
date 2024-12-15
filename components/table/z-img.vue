@@ -60,7 +60,7 @@ export default {
   }
 }
 </script>
-<style lang="less" scoped>
+<style lang="scss" scoped>
 .dot {
   font-size: 12px;
   color: #ccc;

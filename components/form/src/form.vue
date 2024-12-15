@@ -615,6 +615,9 @@ export default {
       this.allDisabled = false;
     },
     modelInput(value, { type, prop }) {
+      console.log("🚀 ~ modelInput ~ prop:", prop)
+      console.log("🚀 ~ modelInput ~ value:", value)
+
       // 如果是input类型，会有快速输入的情况，所以添加一个延时器
       // 添加延时器会造成表单校验慢一拍
       /* if (['input', 'password'].includes(type)) {
@@ -627,8 +630,8 @@ export default {
         let parentObj = getPropByPath(this.model, prop).o;
         parentObj[prop.split('.').pop()] = value;
       } */
-      let parentObj = getPropByPath(this.model, prop).o;
-      parentObj[prop.split(".").pop()] = value;
+      let { o, k } = getPropByPath(this.model, prop);
+      o[k] = value
     },
     // get
     // 获取表单验证后的整个model
@@ -808,7 +811,7 @@ export default {
   },
 };
 </script>
-<style lang="less">
+<style lang="scss">
 .zvue-form-wrapper {
   .z-input-number,
   .el-cascader,

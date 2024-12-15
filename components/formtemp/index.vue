@@ -224,7 +224,7 @@ export default {
 };
 </script>
 
-<style lang="less">
+<style lang="scss">
 .zvue-text-mode {
   .el-input__inner {
     color: #606266 !important;

@@ -68,7 +68,7 @@ export default {
 };
 </script>
 
-<style lang="less">
+<style lang="scss">
 .z-group-arrow .el-collapse-item__arrow {
   display: none;
 }

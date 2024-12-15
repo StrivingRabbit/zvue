@@ -1,0 +1,22 @@
+{
+  "name": "z-vue",
+  "version": "0.5.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "async-validator": "^4.2.5",
+    "dayjs": "^1.11.7",
+    "lodash": "^4.17.20",
+    "v-charts": "^1.19.0",
+    "zvue-element-ui": "^2.15.13"
+  },
+  "overrides": {
+    "zrender": "4.3.2"
+  }
+}

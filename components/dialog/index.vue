@@ -170,9 +170,9 @@ export default {
   }
 };
 </script>
-<style lang="less" scoped>
+<style lang="scss" scoped>
 .zvue-dialog {
-  /deep/ .el-dialog__headerbtn {
+  ::v-deep .el-dialog__headerbtn {
     top: 24px !important;
   }
   .zvue-dialog__header {

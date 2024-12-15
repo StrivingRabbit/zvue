@@ -1,3 +1,7 @@
+import ZvueElementUI from 'zvue-element-ui'
+import './css/index.scss'
+import _ from 'lodash';
+
 import Table from './components/table'
 import Pagination from './components/table/pagination'
 import Dropdown from './components/table/dropDown'
@@ -72,6 +76,10 @@ const install = (Vue) => {
     Clickout(Vue);
     Appendtobody(Vue);
     DialogDrag(Vue);
+
+    Vue.use(ZvueElementUI);
+    Vue.prototype._ = _;
+
     components.forEach(component => {
         if (component.install) {
             component.install(Vue);

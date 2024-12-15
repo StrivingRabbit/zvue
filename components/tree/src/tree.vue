@@ -331,7 +331,7 @@ export default {
   }
 };
 </script>
-<style lang="less" scoped>
+<style lang="scss" scoped>
 .zvue-tree_menu {
   width: 200px;
   position: fixed;
@@ -339,7 +339,7 @@ export default {
   flex-wrap: wrap;
   background-color: #fff;
 }
-/deep/ .zvue-tree_item {
+::v-deep .zvue-tree_item {
   height: 34px;
   line-height: 34px;
   outline: 0;
