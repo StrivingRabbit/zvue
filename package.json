@@ -1,11 +1,11 @@
 {
-  "name": "@lxh/zvue",
+  "name": "@liuxiaohang/zvue",
   "version": "0.1.0",
   "description": "",
   "main": "index.js",
   "publishConfig": {
     "access": "public",
-    "registry": "https://registry.npmjs.org/@lxh"
+    "registry": "https://registry.npmjs.org"
   },
   "repository": {
     "type": "git",
